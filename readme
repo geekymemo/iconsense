@@ -26,6 +26,7 @@
 
 
 ## Settings
+
 | Setting                             | Description                                       | Default |
 | ----------------------------------- | ------------------------------------------------- | ------- |
 | `iconSense.autoScanCss`             | Automatically scan all CSS files in the workspace | `true`  |
@@ -61,7 +62,7 @@
 
 ### 3. CSS Icon Detection & Preview
 - Detect icons from **local CSS files** or **remote CDN sources** automatically.  
-- Supports **Font Awesome (FA4–FA7)**, **Bootstrap Icons**, **BoxIcons**, and other popular icon fonts.
+- Supports **Font Awesome (FA4-FA7)**, **Bootstrap Icons**, **BoxIcons**, and other popular icon fonts.
 - Hover to preview icons in your code, including **aliases** and **sibling groups**.
 
 ![CSS Icon Preview GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/font_icons_hover.gif)
@@ -183,8 +184,9 @@ For this reason, the probability of encountering this issue with CDN usage is ve
 MIT License © GeekyMemo
 
 ## Coming Soon
-- FlatIcon Integration – Soon, FlatIcon support will be added, allowing you to search and use FlatIcon icons directly within VS Code.
-- SVG Icon Panel with Iconify – A dedicated icon panel and management interface for SVGs will be provided via Iconify integration.
+- FlatIcon Integration - Soon, FlatIcon support will be added, allowing you to search and use FlatIcon icons directly within VS Code.
+- SVG Icon Panel with Iconify - A dedicated icon panel and management interface for SVGs will be provided via Iconify integration.
+- Image Preview for http or https links.
 
 ## Contact
 - Email: info@geekymemo.com  
