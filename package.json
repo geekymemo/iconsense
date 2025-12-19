@@ -3,12 +3,31 @@
   "displayName": "Icon Sense",
   "description": "Instantly preview images and CSS icons on hover, with smart autocomplete and easy access to your favorite icons.",
   "version": "1.0.0",
-  "icon": "./images/iconsense_logo_128x128.png",
+  "icon": "images/iconsense_logo_128x128.png",
   "publisher": "geekymemo",
   "author": "Mehmet Coskun",
-  "categories": ["Other","Programming Languages","Visualization"],
+  "categories": [
+    "Other",
+    "Programming Languages",
+    "Visualization"
+  ],
   "engines": {
-    "vscode": "^1.70.0"
+    "vscode": "^1.85.0"
+  },
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+ "files": [
+  "out/**",
+  "images/**",
+  "README.md",
+  "CHANGELOG.md",
+  "LICENSE"
+],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/geekymemo/IconSense.git"
   },
   "keywords": [
     "icons",
