@@ -22,8 +22,9 @@
 1. Open VS Code.  
 2. Go to **Extensions** → Search for `IconSense`.  
 3. Click **Install**.  
-4. Reload VS Code if necessary.  
+4. Reload VS Code if necessary. 
 
+---
 
 ## Settings
 
@@ -37,8 +38,9 @@
 | `iconSense.scanJsTs`                | Scan JS/TS files                                  | `true`  |
 | `iconSense.scanPhp`                 | Scan PHP files                                    | `false` |
 
- Tip: You can configure settings via VS Code **Settings** or directly in `settings.json`
+Tip: You can configure settings via VS Code **Settings** or directly in `settings.json`
 
+---
 
 ## Features
 
@@ -47,25 +49,25 @@
 - **File Size** and **Dimensions** are displayed alongside the preview.
 - Example: `Preview: 450 KB | 128x128 px`
 
-![Hover Preview GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/image_and_svg_hover.gif)
+![Hover Preview](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/image_and_svg_hover.gif)
 
 ---
 
-### 2. Inline SVG Preview
+### 2. CSS Icon Detection & Preview
 - Preview `<svg>...</svg>` blocks directly in your code.  
 - Converts SVGs to base64 for instant rendering.  
 - Useful for inline SVGs in HTML, Vue, React, or plain JS files.
 
-![SVG Preview GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/svg_and_inline_hover.gif)
+![CSS Icon Preview](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/font_icons_hover.gif)
 
 ---
 
-### 3. CSS Icon Detection & Preview
+### 3. Icon Picker Panel
 - Detect icons from **local CSS files** or **remote CDN sources** automatically.  
 - Supports **Font Awesome (FA4-FA7)**, **Bootstrap Icons**, **BoxIcons**, and other popular icon fonts.
 - Hover to preview icons in your code, including **aliases** and **sibling groups**.
 
-![CSS Icon Preview GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/font_icons_hover.gif)
+![Icon Picker](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/auto_panel_open.gif)
 
 ---
 
@@ -128,7 +130,7 @@
 #### Multiple CSS Libraries & Unicode Collision Warning
 - Some icon libraries ship multiple CSS files using different font files, but reuse the same unicode values across those fonts.
 
-- **Example: Boxicons**
+**Example: Boxicons**
 
 * When using both:
   1. boxicons.min.css
@@ -181,7 +183,8 @@ For this reason, the probability of encountering this issue with CDN usage is ve
 
 ---
 
-MIT License © GeekyMemo
+## License
+MIT License © Mehmet Coskun
 
 ## Coming Soon
 - FlatIcon Integration - Soon, FlatIcon support will be added, allowing you to search and use FlatIcon icons directly within VS Code.
