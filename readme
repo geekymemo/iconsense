@@ -1,6 +1,6 @@
 # IconSense - VSCode Icon Preview & Explorer
 
-![IconSense Logo](https://github.com/geekymemo/iconsense/blob/master/images/iconsense_logo_128x128.png)
+![IconSense Logo](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/iconsense_logo_128x128.png)
 
 **IconSense** is a powerful VSCode extension that allows developers to **preview, manage, and explore icons directly in their code**. It supports images, SVGs, CSS icon fonts, and advanced features like **tree-shaking**, **icon picking**, and **CSS-to-SVG conversion**.
 
@@ -46,7 +46,7 @@
 - **File Size** and **Dimensions** are displayed alongside the preview.
 - Example: `Preview: 450 KB | 128x128 px`
 
-![Hover Preview GIF](https://github.com/geekymemo/iconsense/blob/master/images/usage/image_and_svg_hover.gif)
+![Hover Preview GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/image_and_svg_hover.gif)
 
 ---
 
@@ -55,7 +55,7 @@
 - Converts SVGs to base64 for instant rendering.  
 - Useful for inline SVGs in HTML, Vue, React, or plain JS files.
 
-![SVG Preview GIF](https://github.com/geekymemo/iconsense/blob/master/images/usage/svg_and_inline_hover.gif)
+![SVG Preview GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/svg_and_inline_hover.gif)
 
 ---
 
@@ -64,7 +64,7 @@
 - Supports **Font Awesome (FA4–FA7)**, **Bootstrap Icons**, **BoxIcons**, and other popular icon fonts.
 - Hover to preview icons in your code, including **aliases** and **sibling groups**.
 
-![CSS Icon Preview GIF](https://github.com/geekymemo/iconsense/blob/master/images/usage/font_icons_hover.gif)
+![CSS Icon Preview GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/font_icons_hover.gif)
 
 ---
 
@@ -72,7 +72,7 @@
 - Convert any detected CSS icon into an **SVG** instantly.  
 - Ideal for custom projects where you want vector icons.
   
-![Convert to SVG GIF](https://github.com/geekymemo/iconsense/blob/master/images/usage/convert_to_svg.gif)
+![Convert to SVG GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/convert_to_svg.gif)
 
 ---
 
@@ -81,10 +81,10 @@
 - Multiple variations of each icon are supported.  
 - Copy SVG, Unicode, or CSS class names with one click.
 
-![Icon Picker GIF](https://github.com/geekymemo/iconsense/blob/master/images/usage/auto_panel_open.gif)
+![Icon Picker GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/auto_panel_open.gif)
 
 - Icon Picker Preview
-![Icon Picker Preview GIF](https://github.com/geekymemo/iconsense/blob/master/images/usage/auto_panel_preview.gif)
+![Icon Picker Preview GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/auto_panel_preview.gif)
 
 ---
 
@@ -92,7 +92,7 @@
 - Detect unused icons in your project.  
 - Generate **reports** to safely remove unused icons and reduce bundle size.
 
-![Tree-Shaking GIF](images/usage/tree-shaking.gif)
+![Tree-Shaking GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/tree-shaking.gif)
 
 ---
 
