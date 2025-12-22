@@ -45,20 +45,57 @@ const CssScanner_1 = require("../utils/CssScanner");
 const FontManager_1 = require("../utils/FontManager");
 const IconSenseState_1 = require("../state/IconSenseState");
 const library_detectors_1 = require("../utils/library-detectors");
+const StandaloneScanner_1 = require("../utils/StandaloneScanner");
+const config = vscode.workspace.getConfiguration('iconSense');
+const allowFetch = config.get('remoteImageInfo', true);
+const remoteImageCache = new Map();
 class ImageHoverProvider {
     async provideHover(document, position, token) {
         if (!IconSenseState_1.IconSenseState.ready) {
             return null;
         }
-        const range = document.getWordRangeAtPosition(position, /([a-zA-Z0-9\s_\-\.\/]+\.(png|jpg|jpeg|gif|svg|webp))|([a-zA-Z0-9_\-]+)/);
-        if (!range) {
+        let icons = [];
+        if (StandaloneScanner_1.StandaloneScanner.isStandaloneDocument(document.uri)) {
+            icons = await StandaloneScanner_1.StandaloneScanner.scanStandaloneDocument(document);
+        }
+        else {
+            icons = CssScanner_1.CssScanner.getIcons();
+        }
+        const inlineSvg = this.tryExtractInlineSvg(document, position);
+        if (inlineSvg) {
+            const md = new vscode.MarkdownString();
+            md.supportHtml = true;
+            md.isTrusted = true;
+            md.appendMarkdown(`**SVG Preview:**\n\n`);
+            md.appendMarkdown(`![](${inlineSvg})`);
+            return new vscode.Hover(md);
+        }
+        const imageAttrRegex = /(src|href)\s*=\s*(?:"([^"]+)"|'([^']+)'|\{([^}]+)\})/gi;
+        const line = document.lineAt(position).text;
+        let match;
+        while ((match = imageAttrRegex.exec(line))) {
+            const rawPath = match[2] || match[3];
+            const imagePath = this.normalizeImagePath(rawPath);
+            if (!rawPath)
+                continue;
+            if (!rawPath.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i))
+                continue;
+            const start = match.index;
+            const end = start + match[0].length;
+            const range = new vscode.Range(position.line, start, position.line, end);
+            if (range.contains(position)) {
+                return await this.provideImageHover(document, rawPath);
+            }
+        }
+        const rangeimg = document.getWordRangeAtPosition(position, /[^\s"'<>]+\.(png|jpg|jpeg|gif|svg|webp)/i);
+        if (rangeimg) {
+            const word = document.getText(rangeimg);
+            return await this.provideImageHover(document, word);
+        }
+        const iconRange = document.getWordRangeAtPosition(position, /[a-zA-Z0-9_\-:]+/);
+        if (!iconRange)
             return null;
-        }
-        const word = document.getText(range);
-        if (word.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i)) {
-            return this.provideImageHover(document, word);
-        }
-        const icons = CssScanner_1.CssScanner.getIcons();
+        const word = document.getText(iconRange);
         const matchedIcon = icons.find((i) => i.className === word);
         if (matchedIcon) {
             let markdown = new vscode.MarkdownString(`**Icon:** \`${matchedIcon.className}\``);
@@ -66,7 +103,7 @@ class ImageHoverProvider {
             markdown.isTrusted = true;
             const line = document.lineAt(position).text;
             let fullClass = matchedIcon.className;
-            console.log("matchedIcon", matchedIcon);
+            console.log('matchedIcon', matchedIcon);
             const classMatch = line.match(/class=["']([^"']*)["']/);
             if (classMatch) {
                 const classContent = classMatch[1];
@@ -78,7 +115,7 @@ class ImageHoverProvider {
                 try {
                     let iconForPreview = matchedIcon;
                     const expectedFontName = (0, library_detectors_1.detectFontUrlName)(fullClass);
-                    let fontUrl = iconForPreview.allFontUrls?.find(u => u.includes(expectedFontName));
+                    let fontUrl = iconForPreview.allFontUrls?.find((u) => u.includes(expectedFontName));
                     if (!iconForPreview.cssValue)
                         return null;
                     if (!fontUrl) {
@@ -100,8 +137,8 @@ class ImageHoverProvider {
                             className: fullClass,
                             range: {
                                 start: range?.start,
-                                end: range?.end
-                            }
+                                end: range?.end,
+                            },
                         }))}" title="Click to convert icon to SVG">🛠 Convert to SVG</a>`;
                         markdown.appendMarkdown(linkHtml);
                         if (iconForPreview.detectedFontType) {
@@ -117,12 +154,10 @@ class ImageHoverProvider {
                     markdown.appendMarkdown(`\n\n(Preview error)`);
                 }
                 markdown.appendMarkdown(`\n\n**Unicode:** \`${matchedIcon.cssValue}\``);
-                if (matchedIcon.isAlias && matchedIcon.siblingClassNames &&
-                    matchedIcon.siblingClassNames.length >= 2) {
-                    const aliases = matchedIcon.siblingClassNames
-                        .filter(name => name !== matchedIcon.className);
+                if (matchedIcon.isAlias && matchedIcon.siblingClassNames && matchedIcon.siblingClassNames.length >= 2) {
+                    const aliases = matchedIcon.siblingClassNames.filter((name) => name !== matchedIcon.className);
                     if (aliases.length) {
-                        markdown.appendMarkdown(`\n\n*Alias of:* ${aliases.map(a => `\`${a}\``).join(', ')}`);
+                        markdown.appendMarkdown(`\n\n*Alias of:* ${aliases.map((a) => `\`${a}\``).join(', ')}`);
                     }
                 }
             }
@@ -153,23 +188,6 @@ class ImageHoverProvider {
             }
             return new vscode.Hover(markdown);
         }
-        const svgPreview = this.tryExtractInlineSvg(document, position);
-        if (svgPreview) {
-            const md = new vscode.MarkdownString();
-            md.supportHtml = true;
-            md.isTrusted = true;
-            md.appendMarkdown(`**SVG Preview:**\n\n`);
-            md.appendMarkdown(`![](${svgPreview})`);
-            return new vscode.Hover(md);
-        }
-        const line = document.lineAt(position).text;
-        const potentialPathMatch = line.match(/(?:src|href)=["']([^"']+\.(png|jpg|jpeg|gif|svg|webp))["']/i);
-        if (potentialPathMatch) {
-            const filePath = potentialPathMatch[1];
-            if (filePath.includes(document.getText(range))) {
-                return this.provideImageHover(document, filePath);
-            }
-        }
         return null;
     }
     findITagRange(document, position) {
@@ -189,75 +207,85 @@ class ImageHoverProvider {
     tryExtractInlineSvg(document, position) {
         const text = document.getText();
         const offset = document.offsetAt(position);
-        const start = text.lastIndexOf("<svg", offset);
+        const start = text.lastIndexOf('<svg', offset);
         if (start === -1)
             return null;
-        const end = text.indexOf("</svg>", start);
+        const end = text.indexOf('</svg>', start);
         if (end === -1)
             return null;
-        const svgText = text.substring(start, end + "</svg>".length);
-        const svgEnd = end + "</svg>".length;
+        const svgText = text.substring(start, end + '</svg>'.length);
+        const svgEnd = end + '</svg>'.length;
         if (offset < start || offset > svgEnd) {
             return null;
         }
         if (svgText.length > 50000)
             return null;
-        if (svgText.includes("<script"))
+        if (svgText.includes('<script'))
             return null;
-        const base64 = Buffer.from(svgText.replace(/currentColor/g, '#007ACC')).toString("base64");
+        const base64 = Buffer.from(svgText.replace(/currentColor/g, '#007ACC')).toString('base64');
         return `data:image/svg+xml;base64,${base64}`;
     }
-    detectIconPrefix(fullClass) {
-        if (!fullClass)
-            return undefined;
-        const classes = fullClass.split(/\s+/).map(c => c.trim()).filter(Boolean);
-        const faPrefixes = ['fa', 'fas', 'far', 'fal', 'fat', 'fad', 'fab'];
-        const bootstrapPrefixes = ['bi'];
-        const boxPrefixes = ['bx', 'bxs', 'bxr'];
-        for (const c of classes) {
-            if (faPrefixes.includes(c))
-                return c;
-        }
-        if (classes.includes('bi'))
-            return 'bi';
-        if (classes.some(c => c === 'bx' || c.startsWith('bx'))) {
-            return 'bx';
-        }
-        const fa4Like = classes.find(c => c.startsWith("fa-"));
-        if (fa4Like)
-            return "fa";
-        return undefined;
-    }
-    async glyphToSvgDataUri(iconDef) {
-        if (!iconDef.cssValue || !iconDef.fontUrl) {
-            return null;
-        }
-        console.log(`Generating SVG for icon: ${iconDef.className} using font URL: ${iconDef.fontUrl}`);
-        try {
-            const font = await FontManager_1.FontManager.loadFontFromUrl(iconDef.fontUrl);
-            if (!font) {
-                return null;
+    async provideImageHover(document, imagePath) {
+        if (/^https?:\/\//i.test(imagePath)) {
+            const markdown = new vscode.MarkdownString();
+            markdown.isTrusted = true;
+            markdown.supportHtml = true;
+            markdown.appendMarkdown(`**Preview:**\n\n![img](${imagePath})`);
+            if (allowFetch) {
+                console.log('Fetching remote image info for hover:', imagePath);
+                const info = await this.fetchRemoteImageInfo(imagePath);
+                if (info) {
+                    markdown.appendMarkdown(`\n\n**Resolution:** ${info.width} × ${info.height}px` + `, **Size:** ${info.sizeKB} KB`);
+                }
             }
-            return FontManager_1.FontManager.glyphToSvgDataUri(font, iconDef.cssValue);
+            return new vscode.Hover(markdown);
         }
-        catch (err) {
-            console.error(`Hover SVG generation failed for ${iconDef.className}`, err);
-            return null;
+        function resolveFrameworkAliases(imagePath, rootPath) {
+            const candidates = [];
+            if (imagePath.startsWith('@/')) {
+                candidates.push(path.join(rootPath, imagePath.substring(2)));
+            }
+            if (imagePath.startsWith('~/')) {
+                candidates.push(path.join(rootPath, imagePath.substring(2)));
+            }
+            candidates.push(path.join(rootPath, 'assets', imagePath.replace(/^\/+/, '')));
+            candidates.push(path.join(rootPath, 'public', imagePath.replace(/^\/+/, '')));
+            candidates.push(path.join(rootPath, 'static', imagePath.replace(/^\/+/, '')));
+            return candidates;
         }
-    }
-    provideImageHover(document, imagePath) {
         const currentDir = path.dirname(document.fileName);
-        let absolutePath = path.resolve(currentDir, imagePath);
-        if (!fs.existsSync(absolutePath)) {
+        let absolutePath = null;
+        const relativePath = path.resolve(currentDir, imagePath);
+        if (fs.existsSync(relativePath)) {
+            absolutePath = relativePath;
+        }
+        if (!absolutePath) {
             const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
             if (workspaceFolder) {
-                absolutePath = path.resolve(workspaceFolder.uri.fsPath, imagePath);
-                if (!fs.existsSync(absolutePath) && imagePath.startsWith('/')) {
-                    absolutePath = path.resolve(workspaceFolder.uri.fsPath, imagePath.substring(1));
+                const rootPath = workspaceFolder.uri.fsPath;
+                const rootRelative = path.resolve(rootPath, imagePath);
+                if (fs.existsSync(rootRelative)) {
+                    absolutePath = rootRelative;
+                }
+                if (!absolutePath && imagePath.startsWith('/')) {
+                    const stripped = imagePath.substring(1);
+                    const rootAbsolute = path.resolve(rootPath, stripped);
+                    if (fs.existsSync(rootAbsolute)) {
+                        absolutePath = rootAbsolute;
+                    }
+                }
+                if (!absolutePath) {
+                    const candidates = resolveFrameworkAliases(imagePath, rootPath);
+                    for (const p of candidates) {
+                        if (fs.existsSync(p)) {
+                            absolutePath = p;
+                            break;
+                        }
+                    }
                 }
             }
         }
-        if (!fs.existsSync(absolutePath))
+        if (!absolutePath)
             return null;
         const ext = path.extname(absolutePath).toLowerCase();
         const markdown = new vscode.MarkdownString();
@@ -275,7 +303,8 @@ class ImageHoverProvider {
                 if (widthMatch && heightMatch) {
                     dimensionText = `${widthMatch[1]} x ${heightMatch[1]} px`;
                 }
-                markdown.appendMarkdown(`**Preview (${dimensionText}${dimensionText ? ', ' : ''}${fileSizeKB} KB):**\n\n![${imagePath}](data:image/svg+xml;base64,${base64})`);
+                markdown.appendMarkdown(`**Preview (${dimensionText}${dimensionText ? ', ' : ''}${fileSizeKB} KB):**\n\n` +
+                    `![${imagePath}](${vscode.Uri.file(absolutePath)})`);
             }
             else {
                 const buffer = fs.readFileSync(absolutePath);
@@ -283,7 +312,8 @@ class ImageHoverProvider {
                 if (dimensions.width && dimensions.height) {
                     dimensionText = `${dimensions.width} x ${dimensions.height} px`;
                 }
-                markdown.appendMarkdown(`**Preview (${dimensionText}${dimensionText ? ', ' : ''}${fileSizeKB} KB):**\n\n![${imagePath}](${vscode.Uri.file(absolutePath)})`);
+                markdown.appendMarkdown(`**Preview (${dimensionText}${dimensionText ? ', ' : ''}${fileSizeKB} KB):**\n\n` +
+                    `![${imagePath}](${vscode.Uri.file(absolutePath)})`);
             }
         }
         catch (e) {
@@ -291,6 +321,45 @@ class ImageHoverProvider {
             markdown.appendMarkdown(`**Preview:**\n\n![${imagePath}](${vscode.Uri.file(absolutePath)})`);
         }
         return new vscode.Hover(markdown);
+    }
+    normalizeImagePath(raw) {
+        let p = raw.trim();
+        p = p.replace(/^[`'"]|[`'"]$/g, '');
+        if (p.includes('${'))
+            return null;
+        const requireMatch = p.match(/require\(['"](.+?)['"]\)/);
+        if (requireMatch)
+            return requireMatch[1];
+        return p;
+    }
+    async fetchRemoteImageInfo(url) {
+        if (remoteImageCache.has(url)) {
+            return remoteImageCache.get(url);
+        }
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 4000);
+            const res = await fetch(url, {
+                signal: controller.signal,
+            });
+            clearTimeout(timeout);
+            if (!res.ok)
+                return null;
+            const buffer = Buffer.from(await res.arrayBuffer());
+            const dimensions = (0, image_size_1.default)(buffer);
+            if (!dimensions.width || !dimensions.height)
+                return null;
+            const info = {
+                width: dimensions.width,
+                height: dimensions.height,
+                sizeKB: +(buffer.length / 1024).toFixed(1),
+            };
+            remoteImageCache.set(url, info);
+            return info;
+        }
+        catch {
+            return null;
+        }
     }
 }
 exports.ImageHoverProvider = ImageHoverProvider;

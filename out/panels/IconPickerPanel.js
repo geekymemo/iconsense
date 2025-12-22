@@ -35,10 +35,12 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IconPickerPanel = void 0;
 const vscode = __importStar(require("vscode"));
+const path = __importStar(require("path"));
 const CssScanner_1 = require("../utils/CssScanner");
 const treeShaking_1 = require("../treeShaking/treeShaking");
 const FontManager_1 = require("../utils/FontManager");
 const IconSenseState_1 = require("../state/IconSenseState");
+const StandaloneScanner_1 = require("../utils/StandaloneScanner");
 class IconPickerPanel {
     generateIconImage(className) {
         return new Promise((resolve) => {
@@ -53,7 +55,11 @@ class IconPickerPanel {
                 clearTimeout(timeout);
                 resolve(data);
             });
-            this._panel.webview.postMessage({ command: 'generateIcon', requestId, className });
+            this._panel.webview.postMessage({
+                command: 'generateIcon',
+                requestId,
+                className,
+            });
         });
     }
     constructor(panel, extensionUri, _context) {
@@ -64,7 +70,7 @@ class IconPickerPanel {
         this._extensionUri = extensionUri;
         this.refresh();
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
-        this._panel.webview.onDidReceiveMessage(message => {
+        this._panel.webview.onDidReceiveMessage((message) => {
             switch (message.command) {
                 case 'insertIcon':
                     this._insertIcon(message.className);
@@ -82,7 +88,7 @@ class IconPickerPanel {
                     const reports = treeShaking_1.TreeShaker.getTreeShakingReports();
                     this._panel.webview.postMessage({
                         command: 'showStatistics',
-                        reports
+                        reports,
                     });
                     return;
                 }
@@ -105,28 +111,57 @@ class IconPickerPanel {
         const targetColumn = column || (activeEditor ? activeEditor.viewColumn : vscode.ViewColumn.One);
         if (IconPickerPanel.currentPanel) {
             IconPickerPanel.currentPanel._targetEditor = activeEditor;
+            if (activeEditor && StandaloneScanner_1.StandaloneScanner.isStandaloneDocument(activeEditor.document.uri)) {
+                IconPickerPanel.currentPanel._mode = 'standalone';
+            }
+            else {
+                IconPickerPanel.currentPanel._mode = 'workspace';
+            }
             IconPickerPanel.currentPanel._panel.reveal(targetColumn, preserveFocus);
             IconPickerPanel.currentPanel.refresh();
             return;
         }
-        const workspaceRoots = vscode.workspace.workspaceFolders?.map(f => f.uri) ?? [];
-        const panel = vscode.window.createWebviewPanel('iconsense', (treeShaking_1.TreeShaker.detectedLibraries.length ? 'Icon Sense - Icon Picker' : 'Icon Sense'), { viewColumn: targetColumn || vscode.ViewColumn.One, preserveFocus }, {
+        const activeFileDir = activeEditor ? vscode.Uri.file(path.dirname(activeEditor.document.uri.fsPath)) : null;
+        const workspaceRoots = vscode.workspace.workspaceFolders?.map((f) => f.uri) ?? [];
+        const standaloneCssDirs = StandaloneScanner_1.StandaloneScanner.getIcons()
+            .map((i) => i.sourceFile)
+            .filter((f) => !!f && !f.startsWith('http'))
+            .map((f) => vscode.Uri.file(path.dirname(f)));
+        const panel = vscode.window.createWebviewPanel('iconsense', treeShaking_1.TreeShaker.detectedLibraries.length ? 'Icon Sense - Icon Picker' : 'Icon Sense', { viewColumn: targetColumn || vscode.ViewColumn.One, preserveFocus }, {
             enableScripts: true,
             retainContextWhenHidden: false,
             localResourceRoots: [
                 vscode.Uri.joinPath(extensionUri, 'out'),
-                ...workspaceRoots
-            ]
+                ...workspaceRoots,
+                ...(activeFileDir ? [activeFileDir] : []),
+                ...standaloneCssDirs,
+            ],
         });
         IconPickerPanel.currentPanel = new IconPickerPanel(panel, extensionUri, context);
         IconPickerPanel.currentPanel._targetEditor = activeEditor;
     }
     async refresh() {
         this._panel.webview.html = this._getLoadingHtml();
-        const treeShakeDiagnostics = vscode.languages.createDiagnosticCollection('tree-shaking');
-        treeShaking_1.TreeShaker.clearCache?.();
-        await CssScanner_1.CssScanner.scanWorkspace(treeShakeDiagnostics, false);
+        if (this._mode === 'standalone') {
+            if (this._targetEditor) {
+                StandaloneScanner_1.StandaloneScanner.clear();
+                this._hardResetWebview();
+                await StandaloneScanner_1.StandaloneScanner.scanStandaloneDocument(this._targetEditor.document);
+            }
+        }
+        else {
+            const treeShakeDiagnostics = vscode.languages.createDiagnosticCollection('tree-shaking');
+            treeShaking_1.TreeShaker.clearCache?.();
+            await CssScanner_1.CssScanner.scanWorkspace(treeShakeDiagnostics, false);
+        }
         this._update();
+    }
+    _hardResetWebview() {
+        this._panel.webview.html = '';
+        setTimeout(() => {
+            this._panel.webview.html = this._getLoadingHtml();
+            this._update();
+        }, 0);
     }
     _insertIcon(className) {
         let editor = vscode.window.activeTextEditor;
@@ -134,11 +169,13 @@ class IconPickerPanel {
             editor = this._targetEditor;
         }
         if (editor) {
-            editor.edit(editBuilder => {
-                editor?.selections.forEach(selection => {
+            editor
+                .edit((editBuilder) => {
+                editor?.selections.forEach((selection) => {
                     editBuilder.insert(selection.active, className);
                 });
-            }).then(success => {
+            })
+                .then((success) => {
                 if (success) {
                     vscode.window.showInformationMessage(`Inserted: ${className}`);
                 }
@@ -275,17 +312,38 @@ class IconPickerPanel {
         `;
     }
     _getHtmlForWebview(webview) {
+        const localCssFiles = new Set();
+        const remoteCssUrls = new Set();
         if (!IconSenseState_1.IconSenseState.ready) {
             return this._getLoadingHtml();
         }
-        if (!treeShaking_1.TreeShaker.detectedLibraries || treeShaking_1.TreeShaker.detectedLibraries.length === 0) {
-            return this._getNoLibraryHtml(webview);
+        if (this._mode === 'workspace') {
+            if (!treeShaking_1.TreeShaker.detectedLibraries?.length) {
+                return this._getNoLibraryHtml(webview);
+            }
+        }
+        if (this._mode === 'standalone') {
+            localCssFiles.clear();
+            remoteCssUrls.clear();
+            StandaloneScanner_1.StandaloneScanner.clear();
+            this._hardResetWebview();
+            if (!StandaloneScanner_1.StandaloneScanner.getIcons().length) {
+                return this._getNoLibraryHtml(webview);
+            }
         }
         const config = vscode.workspace.getConfiguration('iconsense');
         const showIconIndex = config.get('debug.showIconIndex', false);
-        const icons = CssScanner_1.CssScanner.getIcons();
+        const workspaceIcons = CssScanner_1.CssScanner.getIcons();
+        const standaloneIcons = StandaloneScanner_1.StandaloneScanner.hasActiveStandaloneIcons() ? StandaloneScanner_1.StandaloneScanner.getIcons() : [];
+        const icons = [
+            ...workspaceIcons.map((i) => ({ ...i, __source: 'workspace' })),
+            ...standaloneIcons.map((i) => ({ ...i, __source: 'standalone' })),
+        ];
+        if (icons.length === 0) {
+            return this._getNoLibraryHtml(webview);
+        }
         const uniqueIconsMap = new Map();
-        icons.forEach(icon => {
+        icons.forEach((icon) => {
             const key = `${icon.className}|${icon.prefix}|${icon.sourceFile}`;
             if (!uniqueIconsMap.has(key)) {
                 uniqueIconsMap.set(key, icon);
@@ -293,36 +351,33 @@ class IconPickerPanel {
         });
         const uniqueIcons = Array.from(uniqueIconsMap.values());
         const uniqueFonts = new Map();
-        uniqueIcons.forEach(icon => {
+        uniqueIcons.forEach((icon) => {
             if (!icon.fontUrl || !icon.fontFamily)
                 return;
             const key = `${icon.fontFamily}::${icon.fontUrl}`;
             if (!uniqueFonts.has(key)) {
                 uniqueFonts.set(key, {
                     fontFamily: icon.fontFamily,
-                    fontUrl: icon.fontUrl
+                    fontUrl: icon.fontUrl,
                 });
             }
         });
         const fontFaceCss = Array.from(uniqueFonts.values())
-            .map(font => {
+            .map((font) => {
             const safeUrl = toWebviewFontUrl(font.fontUrl);
             return FontManager_1.FontManager.getFontFaceCss(font.fontFamily, safeUrl);
         })
             .join('\n');
         const fontClassCss = Array.from(uniqueFonts.values())
-            .map(font => {
+            .map((font) => {
             const safeFamily = font.fontFamily.replace(/[^a-zA-Z0-9_-]/g, '');
             return `.iconfont-${safeFamily} {
                     font-family: '${font.fontFamily}';
                 }`;
         })
             .join('\n');
-        console.log("fontFaceCss " + fontFaceCss);
         const iconsJson = JSON.stringify(uniqueIcons);
-        const localCssFiles = new Set();
-        const remoteCssUrls = new Set();
-        uniqueIcons.forEach(icon => {
+        uniqueIcons.forEach((icon) => {
             if (icon.sourceFile) {
                 if (icon.sourceFile.startsWith('http')) {
                     remoteCssUrls.add(icon.sourceFile);
@@ -333,12 +388,12 @@ class IconPickerPanel {
             }
         });
         const styleTags = [
-            ...Array.from(remoteCssUrls).map(url => `<link rel="stylesheet" href="${url}">`),
-            ...Array.from(localCssFiles).map(file => {
+            ...Array.from(remoteCssUrls).map((url) => `<link rel="stylesheet" href="${url}">`),
+            ...Array.from(localCssFiles).map((file) => {
                 const uri = vscode.Uri.file(file);
                 const webviewUri = webview.asWebviewUri(uri);
                 return `<link rel="stylesheet" href="${webviewUri}">`;
-            })
+            }),
         ].join('\n');
         function toWebviewFontUrl(fontUrl) {
             if (fontUrl.startsWith('http'))
@@ -348,7 +403,20 @@ class IconPickerPanel {
             return `${webviewUri}`;
         }
         const style = `
-          
+            .icon-source-badge {
+                position: absolute;
+                top: 4px;
+                right: 4px;
+                font-size: 9px;
+                padding: 2px 6px;
+                border-radius: 4px;
+                background: #1976d2;
+                color: white;
+                font-family: monospace;
+            }
+            .icon-source-badge.standalone {
+                background: #7b1fa2;
+            }
            .iconfont-fix {font-family: var(--icon-font-family) !important;}
             body { font-family: sans-serif; padding: 10px; }
              .icon-info-modal {
@@ -650,7 +718,6 @@ class IconPickerPanel {
                 const vscode = acquireVsCodeApi();
                 const SHOW_ICON_INDEX = ${showIconIndex ? 'true' : 'false'};
                 const allIcons = ${iconsJson};
-            
                 
                 function openSettingsPickerPanel() {
                     vscode.postMessage({ command: 'openSettings' });

@@ -42,6 +42,7 @@ const CssScanner_1 = require("./utils/CssScanner");
 const treeShaking_1 = require("./treeShaking/treeShaking");
 const IconPickerPanel_1 = require("./panels/IconPickerPanel");
 const IconSenseState_1 = require("./state/IconSenseState");
+const StandaloneScanner_1 = require("./utils/StandaloneScanner");
 const config = vscode.workspace.getConfiguration('iconSense');
 const showNotifications = config.get('showNotifications', true);
 const autoOpenIconPickerPanel = config.get('autoOpenIconPickerPanel', true);
@@ -59,7 +60,7 @@ async function initializeIconSense(context, diagnostics) {
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Window,
             title: 'IconSense: Scanning icons...',
-            cancellable: false
+            cancellable: false,
         }, async () => {
             await CssScanner_1.CssScanner.scanWorkspace(diagnostics, true);
         });
@@ -92,11 +93,11 @@ function activate(context) {
                 IconPickerPanel_1.IconPickerPanel.currentPanel.refresh();
             }
             context.globalState.update('iconsense.panelOpen', true);
-        }
+        },
     }));
     console.log('Congratulations, your extension "IconSense" is now active!');
     createStatusBar(context);
-    context.subscriptions.push(vscode.commands.registerCommand('iconsense.openPicker', () => {
+    context.subscriptions.push(vscode.commands.registerCommand('iconsense.openPicker', async () => {
         if (!IconSenseState_1.IconSenseState.ready) {
             if (!IconSenseState_1.IconSenseState.warnedNotReady) {
                 vscode.window.showInformationMessage('IconSense is still initializing...');
@@ -104,12 +105,37 @@ function activate(context) {
             }
             return;
         }
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+            await StandaloneScanner_1.StandaloneScanner.scanStandaloneDocument(editor.document);
+        }
         IconPickerPanel_1.IconPickerPanel.createOrShow(context, context.extensionUri, vscode.ViewColumn.Beside, false);
+    }));
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+        if (!editor)
+            return;
+        const wasStandalone = StandaloneScanner_1.StandaloneScanner.hasActiveStandaloneIcons();
+        await StandaloneScanner_1.StandaloneScanner.scanStandaloneDocument(editor.document);
+        const isStandalone = StandaloneScanner_1.StandaloneScanner.hasActiveStandaloneIcons();
+        if (IconPickerPanel_1.IconPickerPanel.currentPanel && wasStandalone !== isStandalone) {
+            IconPickerPanel_1.IconPickerPanel.currentPanel.refresh();
+        }
     }));
     const diagnostics = vscode.languages.createDiagnosticCollection('tree-shaking');
     initializeIconSense(context, diagnostics);
-    const hoverProvider = vscode.languages.registerHoverProvider(['html', 'css', 'javascript', 'typescript', 'javascriptreact', 'typescriptreact'], new HoverProvider_1.ImageHoverProvider());
-    const completionProvider = vscode.languages.registerCompletionItemProvider(['html', 'javascript', 'typescript', 'javascriptreact', 'typescriptreact'], new CompletionProvider_1.IconCompletionProvider(), '=', '"', '\'', ' ');
+    const hoverProvider = vscode.languages.registerHoverProvider([
+        'html',
+        'css',
+        'javascript',
+        'typescript',
+        'javascriptreact',
+        'typescriptreact',
+        'vue',
+        'php',
+        'razor',
+        'svelte',
+    ], new HoverProvider_1.ImageHoverProvider());
+    const completionProvider = vscode.languages.registerCompletionItemProvider(['html', 'javascript', 'typescript', 'javascriptreact', 'typescriptreact'], new CompletionProvider_1.IconCompletionProvider(), '=', '"', "'", ' ');
     let debounceTimer = null;
     const DEBOUNCE_DELAY = 500;
     let lastForceTime = 0;
@@ -128,9 +154,9 @@ function activate(context) {
                     lastForceTime = now;
                 }
                 const reports = treeShaking_1.TreeShaker.getTreeShakingReports();
-                const dangerousReports = reports.filter(r => r.severity === 'danger');
+                const dangerousReports = reports.filter((r) => r.severity === 'danger');
                 if (dangerousReports.length && showNotifications && !treeShakingNotificationShown) {
-                    vscode.window.showWarningMessage(`Tree-shaking issue: ${dangerousReports.map(r => `${r.library}: ${r.usedIcons}/${r.totalIcons}`).join(', ')}`);
+                    vscode.window.showWarningMessage(`Tree-shaking issue: ${dangerousReports.map((r) => `${r.library}: ${r.usedIcons}/${r.totalIcons}`).join(', ')}`);
                     treeShakingNotificationShown = true;
                 }
             }
@@ -149,9 +175,8 @@ function activate(context) {
         const editor = vscode.window.activeTextEditor;
         if (!editor)
             return;
-        const document = editor.document;
         const range = new vscode.Range(new vscode.Position(args.range.start.line, args.range.start.character), new vscode.Position(args.range.end.line, args.range.end.character));
-        await editor.edit(editBuilder => {
+        await editor.edit((editBuilder) => {
             editBuilder.replace(range, args.svg);
         });
     });
@@ -181,12 +206,11 @@ function activate(context) {
             return;
         IconPickerPanel_1.IconPickerPanel.createOrShow(context, context.extensionUri, vscode.ViewColumn.Beside, true);
     };
-    context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(checkContext), vscode.workspace.onDidChangeTextDocument(e => {
+    context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(checkContext), vscode.workspace.onDidChangeTextDocument((e) => {
         if (e.document === vscode.window.activeTextEditor?.document) {
             checkContext();
         }
     }));
 }
-function deactivate() {
-}
+function deactivate() { }
 //# sourceMappingURL=extension.js.map

@@ -8,21 +8,21 @@
 
 ## Table of Contents
 
-1. [Installation](#installation)  
-2. [Settings](#settings)  
-3. [Features](#features)  
-4. [Usage](#usage)  
-5. [Multiple CSS Libraries & Unicode Collision Warning](#multiple-css-libraries--unicode-collision-warning)  
-6. [License](#license)  
+1. [Installation](#installation)
+2. [Settings](#settings)
+3. [Features](#features)
+4. [Usage](#usage)
+5. [Multiple CSS Libraries & Unicode Collision Warning](#multiple-css-libraries--unicode-collision-warning)
+6. [License](#license)
 
 ---
 
 ## Installation
 
-1. Open VS Code.  
-2. Go to **Extensions** → Search for `IconSense`.  
-3. Click **Install**.  
-4. Reload VS Code if necessary. 
+1. Open VS Code.
+2. Go to **Extensions** → Search for `IconSense`.
+3. Click **Install**.
+4. Reload VS Code if necessary.
 
 ---
 
@@ -45,7 +45,8 @@ Tip: You can configure settings via VS Code **Settings** or directly in `setting
 ## Features
 
 ### 1. Hover Image Preview
-- Hover over any image file (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`) to instantly see an **inline preview**.  
+
+- Hover over any image file (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`) to instantly see an **inline preview**.
 - **File Size** and **Dimensions** are displayed alongside the preview.
 - Example: `Preview: 450 KB | 128x128 px`
 
@@ -54,8 +55,9 @@ Tip: You can configure settings via VS Code **Settings** or directly in `setting
 ---
 
 ### 2. CSS Icon Detection & Preview
-- Preview `<svg>...</svg>` blocks directly in your code.  
-- Converts SVGs to base64 for instant rendering.  
+
+- Preview `<svg>...</svg>` blocks directly in your code.
+- Converts SVGs to base64 for instant rendering.
 - Useful for inline SVGs in HTML, Vue, React, or plain JS files.
 
 ![CSS Icon Preview](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/font_icons_hover.gif)
@@ -63,7 +65,8 @@ Tip: You can configure settings via VS Code **Settings** or directly in `setting
 ---
 
 ### 3. Icon Picker Panel
-- Detect icons from **local CSS files** or **remote CDN sources** automatically.  
+
+- Detect icons from **local CSS files** or **remote CDN sources** automatically.
 - Supports **Font Awesome (FA4-FA7)**, **Bootstrap Icons**, **BoxIcons**, and other popular icon fonts.
 - Hover to preview icons in your code, including **aliases** and **sibling groups**.
 
@@ -72,27 +75,30 @@ Tip: You can configure settings via VS Code **Settings** or directly in `setting
 ---
 
 ### 4. Convert CSS Icon to SVG
-- Convert any detected CSS icon into an **SVG** instantly.  
+
+- Convert any detected CSS icon into an **SVG** instantly.
 - Ideal for custom projects where you want vector icons.
-  
+
 ![Convert to SVG GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/convert_to_svg.gif)
 
 ---
 
 ### 5. Icon Picker Panel
-- Browse, search, and select icons visually from the **sidebar panel**.  
-- Multiple variations of each icon are supported.  
+
+- Browse, search, and select icons visually from the **sidebar panel**.
+- Multiple variations of each icon are supported.
 - Copy SVG, Unicode, or CSS class names with one click.
 
 ![Icon Picker GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/auto_panel_open.gif)
 
 - Icon Picker Preview
-![Icon Picker Preview GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/auto_panel_preview.gif)
+  ![Icon Picker Preview GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/auto_panel_preview.gif)
 
 ---
 
 ### 6. Tree-Shaking & Optimization
-- Detect unused icons in your project.  
+
+- Detect unused icons in your project.
 - Generate **reports** to safely remove unused icons and reduce bundle size.
 
 ![Tree-Shaking GIF](https://raw.githubusercontent.com/geekymemo/IconSense/master/images/usage/tree-shaking.gif)
@@ -100,20 +106,23 @@ Tip: You can configure settings via VS Code **Settings** or directly in `setting
 ---
 
 ### 7. Framework Compatibility
+
 - Works seamlessly with **Vue**, **Nuxt**, **React**, **Next.js**, and **plain HTML** projects.
 
 ---
 
 ### 8. Developer-Friendly Workflow
-- Inline previews speed up development.  
-- Works efficiently in **large projects** with caching and batch processing.  
+
+- Inline previews speed up development.
+- Works efficiently in **large projects** with caching and batch processing.
 - Supports **offline previews** for local CSS and images.
 
 ---
 
 ### 9. Auto-Detection Features
-- **Auto-detect icon prefixes** (FA, Bootstrap, Boxicons).  
-- Resolves **alias icons** and groups **sibling icons**.  
+
+- **Auto-detect icon prefixes** (FA, Bootstrap, Boxicons).
+- Resolves **alias icons** and groups **sibling icons**.
 - Handles different icon variations and font types automatically.
 
 ---
@@ -126,75 +135,93 @@ Tip: You can configure settings via VS Code **Settings** or directly in `setting
 4. Click **Convert to SVG** for any CSS icon to use as a vector.
 5. Use **tree-shaking reports** to clean up unused icons.
 
+---
+
+## What's New
+
+- Standalone font-icon scanning and Icon Picker for files opened outside the project.
+- Image hover preview for standalone files, including SVGs.
+- Hover preview for internet-sourced images, with dimension and file size info (if `remoteImageInfo` is enabled).
+- Fixes for preview issues in Nuxt, Vue, React, and Next.js projects.
+
+---
 
 #### Multiple CSS Libraries & Unicode Collision Warning
+
 - Some icon libraries ship multiple CSS files using different font files, but reuse the same unicode values across those fonts.
 
 **Example: Boxicons**
 
-* When using both:
-  1. boxicons.min.css
-  2. boxicons-brands.min.css
+- When using both:
+    1. boxicons.min.css
+    2. boxicons-brands.min.css
 
 You may encounter incorrectly rendered icons.
 Why this happens
 boxicons.min.css contains the following rule:
 
 ```css
-.bx,[class*=" bx"],[class^=bx] {
-  font-family: boxicons !important;
+.bx,
+[class*=' bx'],
+[class^='bx'] {
+    font-family: boxicons !important;
 }
 ```
 
 The selector:[class^=bx]
 
 matches any class starting with bx, including:
+
 ```css
 <i class="bx-airbnb"></i>
 <i class="bxl bx-airbnb"></i>
 ```
 
-* As a result:
-boxicons-brands icons are forced to use the boxicons font Many unicode values (\f104, etc.) exist in both fonts The browser renders the wrong glyph. (e.g. accessibility instead of Airbnb).
+- As a result:
+  boxicons-brands icons are forced to use the boxicons font Many unicode values (\f104, etc.) exist in both fonts The browser renders the wrong glyph. (e.g. accessibility instead of Airbnb).
 
 This behavior is caused by overly broad selectors combined with !important. Recommended Fix (Boxicons) Modify the following selector in boxicons.min.css:
 
 ```css
 -.bx, [class*=" bx"], [class^=bx]
-+.bx 
++.bx
 ```
 
 - This limits the font override to only the intended base icons and prevents brand icons from being overridden.
 
 ### Notes
+
 This issue is not specific to IconSense.
 It can occur in any project where multiple CSS files from the same provider are used
 The problem is more common with locally bundled CSS
 CDN builds often mitigate this via different selector strategies or load order
 
-* CDN vs Local Usage
-This issue is much more likely when using local CSS files.
-When using CDN versions of icon libraries:
-CSS files are often better isolated
-Selector scopes are usually less aggressive
-Load order is typically well-tested
-Conflicting font-family overrides are far less common.
-For this reason, the probability of encountering this issue with CDN usage is very low, though not impossible.
+- CDN vs Local Usage
+  This issue is much more likely when using local CSS files.
+  When using CDN versions of icon libraries:
+  CSS files are often better isolated
+  Selector scopes are usually less aggressive
+  Load order is typically well-tested
+  Conflicting font-family overrides are far less common.
+  For this reason, the probability of encountering this issue with CDN usage is very low, though not impossible.
 
 ---
 
 ## License
+
 MIT License © Mehmet Coskun
 
 ## Coming Soon
+
 - FlatIcon Integration - Soon, FlatIcon support will be added, allowing you to search and use FlatIcon icons directly within VS Code.
 - SVG Icon Panel with Iconify - A dedicated icon panel and management interface for SVGs will be provided via Iconify integration.
 - Image Preview for http or https links.
 
 ## Contact
-- Email: info@geekymemo.com  
+
+- Email: info@geekymemo.com
 - Email: geekymemo@gmail.com
 - Instagram: [@geekymemo](https://instagram.com/geekymemo)
 
 **Or via Github:**
- https://github.com/geekymemo/IconSense
+https://github.com/geekymemo/IconSense

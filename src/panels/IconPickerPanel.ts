@@ -1,18 +1,21 @@
 import * as vscode from 'vscode';
 import { fileURLToPath } from 'url';
+import * as path from 'path';
 import { CssScanner } from '../utils/CssScanner';
 import { TreeShaker } from '../treeShaking/treeShaking';
 import { IconDefinition } from '../types/icons';
 import { FontManager } from '../utils/FontManager';
 import { IconSenseState } from '../state/IconSenseState';
+import { StandaloneScanner } from '../utils/StandaloneScanner';
 
 export class IconPickerPanel {
     public static currentPanel: IconPickerPanel | undefined;
     private readonly _panel: vscode.WebviewPanel;
     private _disposables: vscode.Disposable[] = [];
     private _extensionUri: vscode.Uri;
-    private _targetEditor: vscode.TextEditor | undefined;
+    private _targetEditor?: vscode.TextEditor;
     private _pendingGenerations = new Map<string, (data: string | null) => void>();
+    private _mode?: 'standalone' | 'workspace';
 
     public generateIconImage(className: string): Promise<string | null> {
         return new Promise((resolve) => {
@@ -31,11 +34,19 @@ export class IconPickerPanel {
                 resolve(data);
             });
 
-            this._panel.webview.postMessage({ command: 'generateIcon', requestId, className });
+            this._panel.webview.postMessage({
+                command: 'generateIcon',
+                requestId,
+                className,
+            });
         });
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, private readonly _context: vscode.ExtensionContext) {
+    private constructor(
+        panel: vscode.WebviewPanel,
+        extensionUri: vscode.Uri,
+        private readonly _context: vscode.ExtensionContext
+    ) {
         this._panel = panel;
         this._extensionUri = extensionUri;
 
@@ -44,7 +55,7 @@ export class IconPickerPanel {
 
         this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
         this._panel.webview.onDidReceiveMessage(
-            message => {
+            (message) => {
                 switch (message.command) {
                     case 'insertIcon':
                         this._insertIcon(message.className);
@@ -63,16 +74,13 @@ export class IconPickerPanel {
                         const reports = TreeShaker.getTreeShakingReports();
                         this._panel.webview.postMessage({
                             command: 'showStatistics',
-                            reports
+                            reports,
                         });
                         return;
                     }
                     case 'openSettings':
                         IconPickerPanel.currentPanel?.dispose();
-                        vscode.commands.executeCommand(
-                            'workbench.action.openSettings',
-                            'iconsense'
-                        );
+                        vscode.commands.executeCommand('workbench.action.openSettings', 'iconsense');
                         return;
                     case 'iconGenerated':
                         const resolver = this._pendingGenerations.get(message.requestId);
@@ -88,32 +96,53 @@ export class IconPickerPanel {
         );
     }
 
-    public static createOrShow(context: vscode.ExtensionContext, extensionUri: vscode.Uri, column?: vscode.ViewColumn, preserveFocus: boolean = false) {
+    public static createOrShow(
+        context: vscode.ExtensionContext,
+        extensionUri: vscode.Uri,
+        column?: vscode.ViewColumn,
+        preserveFocus: boolean = false
+    ) {
         const activeEditor = vscode.window.activeTextEditor;
         const targetColumn = column || (activeEditor ? activeEditor.viewColumn : vscode.ViewColumn.One);
 
         if (IconPickerPanel.currentPanel) {
             IconPickerPanel.currentPanel._targetEditor = activeEditor; // Update target on reveal
+
+            if (activeEditor && StandaloneScanner.isStandaloneDocument(activeEditor.document.uri)) {
+                IconPickerPanel.currentPanel._mode = 'standalone';
+            } else {
+                IconPickerPanel.currentPanel._mode = 'workspace';
+            }
+
             IconPickerPanel.currentPanel._panel.reveal(targetColumn, preserveFocus);
             // Verify cache on reveal too
             IconPickerPanel.currentPanel.refresh();
             return;
         }
 
-        const workspaceRoots =
-            vscode.workspace.workspaceFolders?.map(f => f.uri) ?? [];
+        // aktif dosyanın klasörü (standalone HTML için KRİTİK)
+        const activeFileDir = activeEditor ? vscode.Uri.file(path.dirname(activeEditor.document.uri.fsPath)) : null;
+        const workspaceRoots = vscode.workspace.workspaceFolders?.map((f) => f.uri) ?? [];
+        // standalone CSS klasörleri
+        const standaloneCssDirs = StandaloneScanner.getIcons()
+            .map((i) => i.sourceFile)
+            .filter((f): f is string => !!f && !f.startsWith('http'))
+            .map((f) => vscode.Uri.file(path.dirname(f)));
 
         const panel = vscode.window.createWebviewPanel(
             'iconsense',
-            (TreeShaker.detectedLibraries.length ? 'Icon Sense - Icon Picker' : 'Icon Sense'),
+            TreeShaker.detectedLibraries.length ? 'Icon Sense - Icon Picker' : 'Icon Sense',
             { viewColumn: targetColumn || vscode.ViewColumn.One, preserveFocus },
             {
                 enableScripts: true,
                 retainContextWhenHidden: false,
+                //localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'out'), ...workspaceRoots],
                 localResourceRoots: [
                     vscode.Uri.joinPath(extensionUri, 'out'),
-                    ...workspaceRoots
-                ]
+                    ...workspaceRoots,
+                    ...(activeFileDir ? [activeFileDir] : []),
+                    ...standaloneCssDirs,
+                ],
             }
         );
 
@@ -124,15 +153,32 @@ export class IconPickerPanel {
         // Show loading state first
         this._panel.webview.html = this._getLoadingHtml();
 
-        // Force refresh of icons
-        const treeShakeDiagnostics = vscode.languages.createDiagnosticCollection('tree-shaking');
-        TreeShaker.clearCache?.();
-        await CssScanner.scanWorkspace(treeShakeDiagnostics,false);
+        if (this._mode === 'standalone') {
+            if (this._targetEditor) {
+                StandaloneScanner.clear();
+                this._hardResetWebview();
+                await StandaloneScanner.scanStandaloneDocument(this._targetEditor.document);
+            }
+        } else {
+            // Force refresh of icons
+            const treeShakeDiagnostics = vscode.languages.createDiagnosticCollection('tree-shaking');
+            TreeShaker.clearCache?.();
+            await CssScanner.scanWorkspace(treeShakeDiagnostics, false);
+        }
 
         // Update with new data
         this._update();
     }
-    
+    private _hardResetWebview() {
+        // Webview state tamamen sıfırlanır
+        this._panel.webview.html = '';
+
+        // microtask delay (VS Code webview race fix)
+        setTimeout(() => {
+            this._panel.webview.html = this._getLoadingHtml();
+            this._update();
+        }, 0);
+    }
     private _insertIcon(className: string) {
         // Use the captured target editor if the current one is not active (due to focus loss)
         let editor = vscode.window.activeTextEditor;
@@ -142,28 +188,25 @@ export class IconPickerPanel {
         }
 
         if (editor) {
-            editor.edit(editBuilder => {
-                editor?.selections.forEach(selection => {
-                    editBuilder.insert(selection.active, className);
+            editor
+                .edit((editBuilder) => {
+                    editor?.selections.forEach((selection) => {
+                        editBuilder.insert(selection.active, className);
+                    });
+                })
+                .then((success) => {
+                    if (success) {
+                        vscode.window.showInformationMessage(`Inserted: ${className}`);
+                    } else {
+                        vscode.window.showErrorMessage('Failed to insert icon.');
+                    }
                 });
-            }).then(success => {
-                if (success) {
-                    vscode.window.showInformationMessage(`Inserted: ${className}`);
-                } else {
-                    vscode.window.showErrorMessage('Failed to insert icon.');
-                }
-            });
-
         } else {
             vscode.window.showErrorMessage('No active text editor to insert icon.');
         }
     }
     //panel kaldığı yerden devam etsin. extension.ts den çağıralım
-    public static restore(
-        panel: vscode.WebviewPanel,
-        extensionUri: vscode.Uri,
-        context: vscode.ExtensionContext
-    ) {
+    public static restore(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, context: vscode.ExtensionContext) {
         IconPickerPanel.currentPanel = new IconPickerPanel(panel, extensionUri, context);
     }
     public dispose() {
@@ -291,21 +334,55 @@ export class IconPickerPanel {
     }
 
     private _getHtmlForWebview(webview: vscode.Webview) {
+        //1. Collect Sources (Local files and Remote URLs)
+        const localCssFiles = new Set<string>();
+        const remoteCssUrls = new Set<string>();
+        //const activeEditor = vscode.window.activeTextEditor;
+        //const isStandalone = activeEditor && StandaloneScanner.isStandaloneDocument(activeEditor.document.uri);
+
         if (!IconSenseState.ready) {
             return this._getLoadingHtml();
         }
-        if (!TreeShaker.detectedLibraries || TreeShaker.detectedLibraries.length === 0) {
-            return this._getNoLibraryHtml(webview);
+        // if (!isStandalone && (!TreeShaker.detectedLibraries || TreeShaker.detectedLibraries.length === 0)) {
+        //     return this._getNoLibraryHtml(webview);
+        // }
+        if (this._mode === 'workspace') {
+            if (!TreeShaker.detectedLibraries?.length) {
+                return this._getNoLibraryHtml(webview);
+            }
+        }
+
+        if (this._mode === 'standalone') {
+            localCssFiles.clear();
+            remoteCssUrls.clear();
+            StandaloneScanner.clear();
+            this._hardResetWebview();
+            if (!StandaloneScanner.getIcons().length) {
+                return this._getNoLibraryHtml(webview);
+            }
         }
 
         const config = vscode.workspace.getConfiguration('iconsense');
         const showIconIndex = config.get<boolean>('debug.showIconIndex', false);
 
-        const icons = CssScanner.getIcons();
+        //const icons = CssScanner.getIcons();
+
+        const workspaceIcons = CssScanner.getIcons();
+        const standaloneIcons = StandaloneScanner.hasActiveStandaloneIcons() ? StandaloneScanner.getIcons() : [];
+
+        // birleşik liste (ama işaretli)
+        const icons = [
+            ...workspaceIcons.map((i) => ({ ...i, __source: 'workspace' })),
+            ...standaloneIcons.map((i) => ({ ...i, __source: 'standalone' })),
+        ];
+
+        if (icons.length === 0) {
+            return this._getNoLibraryHtml(webview);
+        }
 
         // Deduplicate icons by className
         const uniqueIconsMap = new Map<string, IconDefinition>();
-        icons.forEach(icon => {
+        icons.forEach((icon) => {
             const key = `${icon.className}|${icon.prefix}|${icon.sourceFile}`;
             if (!uniqueIconsMap.has(key)) {
                 uniqueIconsMap.set(key, icon);
@@ -316,27 +393,27 @@ export class IconPickerPanel {
         // Collect unique fonts
         const uniqueFonts = new Map<string, { fontFamily: string; fontUrl: string }>();
         //uniq font-face listesi çıkar
-        uniqueIcons.forEach(icon => {
+        uniqueIcons.forEach((icon) => {
             if (!icon.fontUrl || !icon.fontFamily) return;
 
             const key = `${icon.fontFamily}::${icon.fontUrl}`;
             if (!uniqueFonts.has(key)) {
                 uniqueFonts.set(key, {
                     fontFamily: icon.fontFamily,
-                    fontUrl: icon.fontUrl
+                    fontUrl: icon.fontUrl,
                 });
             }
         });
         //sadece bu uniq fontlar için font-face üret
         const fontFaceCss = Array.from(uniqueFonts.values())
-            .map(font => {
+            .map((font) => {
                 const safeUrl = toWebviewFontUrl(font.fontUrl);
                 return FontManager.getFontFaceCss(font.fontFamily, safeUrl);
             })
             .join('\n');
 
         const fontClassCss = Array.from(uniqueFonts.values())
-            .map(font => {
+            .map((font) => {
                 const safeFamily = font.fontFamily.replace(/[^a-zA-Z0-9_-]/g, '');
                 return `.iconfont-${safeFamily} {
                     font-family: '${font.fontFamily}';
@@ -344,14 +421,10 @@ export class IconPickerPanel {
             })
             .join('\n');
 
-        console.log("fontFaceCss " + fontFaceCss)
+        //console.log('fontFaceCss ' + fontFaceCss);
         const iconsJson = JSON.stringify(uniqueIcons);
 
-        // 1. Collect Sources (Local files and Remote URLs)
-        const localCssFiles = new Set<string>();
-        const remoteCssUrls = new Set<string>();
-
-        uniqueIcons.forEach(icon => {
+        uniqueIcons.forEach((icon) => {
             if (icon.sourceFile) {
                 if (icon.sourceFile.startsWith('http')) {
                     remoteCssUrls.add(icon.sourceFile);
@@ -362,13 +435,13 @@ export class IconPickerPanel {
         });
         const styleTags = [
             // Remote
-            ...Array.from(remoteCssUrls).map(url => `<link rel="stylesheet" href="${url}">`),
+            ...Array.from(remoteCssUrls).map((url) => `<link rel="stylesheet" href="${url}">`),
             // Local (converted to Webview URI)
-            ...Array.from(localCssFiles).map(file => {
+            ...Array.from(localCssFiles).map((file) => {
                 const uri = vscode.Uri.file(file);
                 const webviewUri = webview.asWebviewUri(uri);
                 return `<link rel="stylesheet" href="${webviewUri}">`;
-            })
+            }),
         ].join('\n');
 
         function toWebviewFontUrl(fontUrl: string): string {
@@ -387,7 +460,20 @@ export class IconPickerPanel {
         //  ${fontClassCss} <---bu arkadaşı kaldırıyoruz çünkü unicode karışıklığı css içindeymiş
         // Styles
         const style = `
-          
+            .icon-source-badge {
+                position: absolute;
+                top: 4px;
+                right: 4px;
+                font-size: 9px;
+                padding: 2px 6px;
+                border-radius: 4px;
+                background: #1976d2;
+                color: white;
+                font-family: monospace;
+            }
+            .icon-source-badge.standalone {
+                background: #7b1fa2;
+            }
            .iconfont-fix {font-family: var(--icon-font-family) !important;}
             body { font-family: sans-serif; padding: 10px; }
              .icon-info-modal {
@@ -692,7 +778,6 @@ export class IconPickerPanel {
                 const vscode = acquireVsCodeApi();
                 const SHOW_ICON_INDEX = ${showIconIndex ? 'true' : 'false'};
                 const allIcons = ${iconsJson};
-            
                 
                 function openSettingsPickerPanel() {
                     vscode.postMessage({ command: 'openSettings' });

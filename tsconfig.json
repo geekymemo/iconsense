@@ -1,14 +1,16 @@
 {
-  "compilerOptions": {
-    "removeComments": true,
-    "module": "commonjs",
-    "target": "es2020",
-    "outDir": "out",
-    "rootDir": "src",
-    "lib": ["es2020"],
-    "strict": true,
-    "sourceMap": true,
-    "esModuleInterop": true
-  },
-  "exclude": ["node_modules", ".vscode-test"]
+    "compilerOptions": {
+        "module": "commonjs",
+        "target": "es2020",
+        "lib": ["es2020"],
+
+        "outDir": "out",
+        "rootDir": "src",
+
+        "removeComments": true,
+        "strict": true,
+        "sourceMap": true,
+        "esModuleInterop": true
+    },
+    "exclude": ["node_modules", ".vscode-test"]
 }

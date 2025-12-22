@@ -6,14 +6,13 @@ import { pathToFileURL } from 'url';
 import { FontManager } from './FontManager';
 
 import type { IconLibraryInfo } from '../types/css';
-import { LIBRARY_DETECTORS, detectFontTypeForUnic } from "./library-detectors";
+import { LIBRARY_DETECTORS, detectFontTypeForUnic } from './library-detectors';
 import { IconDefinition } from '../types/icons';
 import { TreeShaker } from '../treeShaking/treeShaking';
 import { resolveVersion } from '../utils/CssVersion';
 import { fetchUrl, fetchUrlCached } from './CssFetch';
 import { detectIconPrefix, detectBoxiconsFontType } from '../utils/IconPrefix';
 import { getCommentRanges, isInsideComment } from '../utils/CommentRanges';
-
 
 //Auto scan CSS mode ('auto' : 'html-only')
 const config = vscode.workspace.getConfiguration('iconSense');
@@ -29,10 +28,7 @@ const nuxtEnabled = config.get<boolean>('framework.nuxt', true);
 const reactEnabled = config.get<boolean>('framework.react', true);
 const nextEnabled = config.get<boolean>('framework.next', true);
 
-
-
 export class CssScanner {
-
     //icon cahaceleri
     private static cache: IconDefinition[] = [];
 
@@ -63,7 +59,10 @@ export class CssScanner {
     //Workspace
     private static usedIconClasses: Set<string> = new Set();
     private static isScanning: boolean = false;
-    public static async scanWorkspace(diagnostics: vscode.DiagnosticCollection,force:boolean|true): Promise<IconDefinition[]> {
+    public static async scanWorkspace(
+        diagnostics: vscode.DiagnosticCollection,
+        force: boolean | true
+    ): Promise<IconDefinition[]> {
         if (this.isScanning) {
             return this.cache ?? [];
         }
@@ -87,23 +86,25 @@ export class CssScanner {
             const cssResults = await this.processInBatches(cssFiles, 50, async (file) => {
                 return this.parseCssFile(file.fsPath);
             });
-            cssResults.forEach(icons => allIcons.push(...icons));
+            cssResults.forEach((icons) => allIcons.push(...icons));
         }
-
 
         // 2 HTML içindeki remote CSS linkleri
         if (scanHtml) {
-            const htmlFiles = await vscode.workspace.findFiles('**/*.html', '**/node_modules/**');
+            const htmlFiles = await vscode.workspace.findFiles(
+                '**/*.html',
+                '**/node_modules/**'
+            );
             const remoteUrls = await this.findRemoteCssUrls(htmlFiles);
             for (const url of remoteUrls) {
                 try {
                     if (url.startsWith('http')) {
                         const css = await fetchUrlCached(url);
-                        allIcons.push(...await this.extractIcons(css, url));
+                        allIcons.push(...(await this.extractIcons(css, url)));
                     } else {
                         const resolved = this.resolveWorkspaceCss(url);
                         if (resolved) {
-                            allIcons.push(...await this.parseCssFile(resolved));
+                            allIcons.push(...(await this.parseCssFile(resolved)));
                         }
                     }
                 } catch (err) {
@@ -127,11 +128,11 @@ export class CssScanner {
                     for (const url of cssUrls) {
                         if (url.startsWith('http')) {
                             const css = await fetchUrlCached(url);
-                            allIcons.push(...await this.extractIcons(css, url));
+                            allIcons.push(...(await this.extractIcons(css, url)));
                         } else {
                             const resolved = this.resolveWorkspaceCss(url);
                             if (resolved) {
-                                allIcons.push(...await this.parseCssFile(resolved));
+                                allIcons.push(...(await this.parseCssFile(resolved)));
                             }
                         }
                     }
@@ -140,7 +141,6 @@ export class CssScanner {
                 }
             }
         }
-
 
         // 4. Next.js globals.css
         if (nextEnabled) {
@@ -154,18 +154,15 @@ export class CssScanner {
 
         // 6. React / Vue / Nuxt usage tarama
         if (scanJsTs || scanHtml || scanPhp) {
-            await this.scanFrameworkUsages(
-                allIcons,
-                {
-                    vue: vueEnabled,
-                    nuxt: nuxtEnabled,
-                    react: reactEnabled,
-                    next: nextEnabled,
-                    scanPhp,
-                    scanJsTs,
-                    scanHtml
-                }
-            );
+            await this.scanFrameworkUsages(allIcons, {
+                vue: vueEnabled,
+                nuxt: nuxtEnabled,
+                react: reactEnabled,
+                next: nextEnabled,
+                scanPhp,
+                scanJsTs,
+                scanHtml,
+            });
         }
 
         // 7. workspace css kapalıysa ama framework aktifse
@@ -176,10 +173,10 @@ export class CssScanner {
         // 8 TREE-SHAKING ANALİZİ
         TreeShaker.treeShakingReports = TreeShaker.detectTreeShaking(
             allIcons,
-            this.usedIconClasses,
+            this.usedIconClasses
         );
         //TREE-SHAKING dialog
-        TreeShaker.showTreeShakingNotifications(TreeShaker.treeShakingReports,force);
+        TreeShaker.showTreeShakingNotifications(TreeShaker.treeShakingReports, force);
 
         this.cache = allIcons;
         this.iconCache.set(cacheKey, allIcons);
@@ -188,7 +185,6 @@ export class CssScanner {
     }
 
     private static async scanCssImportsFromCode(allIcons: IconDefinition[]) {
-
         const files = await vscode.workspace.findFiles(
             '**/*.{js,jsx,ts,tsx,vue}',
             '**/node_modules/**'
@@ -208,13 +204,16 @@ export class CssScanner {
                 const cssPath = match[1] || match[2];
                 const resolved = this.resolveWorkspaceCss(cssPath, file.fsPath);
                 if (resolved) {
-                    allIcons.push(...await this.parseCssFile(resolved));
+                    allIcons.push(...(await this.parseCssFile(resolved)));
                 }
             }
         }
     }
 
-    private static resolveWorkspaceCss(cssPath: string, importer?: string): string | null {
+    private static resolveWorkspaceCss(
+        cssPath: string,
+        importer?: string
+    ): string | null {
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders) return null;
 
@@ -246,9 +245,7 @@ export class CssScanner {
         return null;
     }
 
-    private static extractCssFromNuxtConfig(
-        content: string
-    ): string[] {
+    private static extractCssFromNuxtConfig(content: string): string[] {
         const urls: string[] = [];
 
         // css: [ '...', "..." ]
@@ -286,7 +283,6 @@ export class CssScanner {
 
             let match: RegExpExecArray | null;
             while ((match = IMPORT_CSS_REGEX.exec(content)) !== null) {
-
                 // COMMENT İÇİNDEYSE → YOK SAY
                 if (isInsideComment(match.index, commentRanges)) {
                     continue;
@@ -296,18 +292,19 @@ export class CssScanner {
 
                 if (cssPath.startsWith('http')) {
                     const css = await fetchUrl(cssPath);
-                    allIcons.push(...await this.extractIcons(css, cssPath));
+                    allIcons.push(...(await this.extractIcons(css, cssPath)));
                 } else {
                     const resolved = this.resolveWorkspaceCss(cssPath, file.fsPath);
                     if (resolved) {
-                        allIcons.push(...await this.parseCssFile(resolved));
+                        allIcons.push(...(await this.parseCssFile(resolved)));
                     }
                 }
             }
         }
     }
 
-    private static async scanFrameworkUsages(allIcons: IconDefinition[],
+    private static async scanFrameworkUsages(
+        allIcons: IconDefinition[],
         options: {
             vue: boolean;
             nuxt: boolean;
@@ -316,7 +313,8 @@ export class CssScanner {
             scanPhp: boolean;
             scanJsTs: boolean;
             scanHtml: boolean;
-        }) {
+        }
+    ) {
         this.usedIconClasses.clear();
 
         // const files = await vscode.workspace.findFiles(
@@ -348,14 +346,12 @@ export class CssScanner {
             const content = (await vscode.workspace.fs.readFile(file)).toString();
             const commentRanges = await getCommentRanges(content);
 
-
             // Vue için sadece <template>
             const templateMatch = /<template[^>]*>([\s\S]*?)<\/template>/i.exec(content);
             const scanContent = templateMatch?.[1] ?? content;
 
             let match;
             while ((match = CLASS_REGEX.exec(scanContent)) !== null) {
-
                 if (isInsideComment(match.index, commentRanges)) {
                     continue; // ← BU ICON KULLANILMADI
                 }
@@ -389,7 +385,6 @@ export class CssScanner {
 
             let match: RegExpExecArray | null;
             while ((match = IMPORT_CSS_REGEX.exec(content)) !== null) {
-
                 // COMMENT İÇİNDEYSE → TAMAMEN YOK SAY
                 if (isInsideComment(match.index, commentRanges)) {
                     continue;
@@ -399,21 +394,24 @@ export class CssScanner {
 
                 if (cssPath.startsWith('http')) {
                     const css = await fetchUrl(cssPath);
-                    allIcons.push(...await this.extractIcons(css, cssPath));
+                    allIcons.push(...(await this.extractIcons(css, cssPath)));
                 } else {
                     const resolved = this.resolveWorkspaceCss(cssPath, file.fsPath);
                     if (resolved) {
-                        allIcons.push(...await this.parseCssFile(resolved));
+                        allIcons.push(...(await this.parseCssFile(resolved)));
                     }
                 }
             }
         }
     }
 
-    private static async findRemoteCssUrls(htmlFiles: vscode.Uri[]): Promise<Set<string>> {
+    private static async findRemoteCssUrls(
+        htmlFiles: vscode.Uri[]
+    ): Promise<Set<string>> {
         const urls = new Set<string>();
         //const linkRegex = /<link[^>]+href=["'](https?:\/\/[^"']+\.css)["'][^>]*>/gi;
-        const linkRegex = /<link[^>]+rel=["']stylesheet["'][^>]*href=["']([^"']+)["'][^>]*>/gi;
+        const linkRegex =
+            /<link[^>]+rel=["']stylesheet["'][^>]*href=["']([^"']+)["'][^>]*>/gi;
 
         await this.processInBatches(htmlFiles, 50, async (file) => {
             try {
@@ -437,7 +435,7 @@ export class CssScanner {
         return urls;
     }
 
-    private static async parseCssFile(filePath: string): Promise<IconDefinition[]> {
+    public static async parseCssFile(filePath: string): Promise<IconDefinition[]> {
         try {
             const content = await fs.promises.readFile(filePath, 'utf-8');
 
@@ -453,8 +451,10 @@ export class CssScanner {
     // css dosyasından @font-face bloklarını oku ve font url lerini ayıkla
     // font-family -> fontUrl eşlemesini çıkar
     // Tüm kütüphaneler için (FA5, FA6, Boxicons, vs.) multi src desteklidir
-    private static extractFontFaces(content: string, baseUrl: string): Map<string, string[]> {
-
+    private static extractFontFaces(
+        content: string,
+        baseUrl: string
+    ): Map<string, string[]> {
         // url içinden gelen path’lerde query ve hash’i temizler
         // örn: fa-solid-900.woff2?#iefix -> fa-solid-900.woff2
         const normalizeFontUrl = (url: string) => url.split(/[?#]/)[0];
@@ -495,7 +495,6 @@ export class CssScanner {
             let urlMatch: RegExpExecArray | null;
 
             while ((urlMatch = urlRegex.exec(ruleBody)) !== null) {
-
                 // ham url
                 let fontUrl = normalizeFontUrl(urlMatch[1]);
 
@@ -507,14 +506,13 @@ export class CssScanner {
                 // -----------------------------
                 // 4 relative path ise absolute hale getir
                 // -----------------------------
-                if (
-                    !fontUrl.startsWith('http://') &&
-                    !fontUrl.startsWith('https://')
-                ) {
+                if (!fontUrl.startsWith('http://') && !fontUrl.startsWith('https://')) {
                     if (baseUrl.startsWith('http')) {
                         // remote css (CDN)
-                        const cssBaseUrl =
-                            baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1);
+                        const cssBaseUrl = baseUrl.substring(
+                            0,
+                            baseUrl.lastIndexOf('/') + 1
+                        );
                         fontUrl = new URL(fontUrl, cssBaseUrl).href;
                     } else {
                         // local css (workspace / extension)
@@ -579,7 +577,7 @@ export class CssScanner {
     //                 let fontUrl = normalizeFontUrl(urlMatch[1]);
 
     //                 // eot atlıyorum çünkü siktiğimin opentype.js desteklemiyor/destkleyemiyor
-    //                 if (fontUrl.endsWith('.eot')) continue; 
+    //                 if (fontUrl.endsWith('.eot')) continue;
 
     //                 if (!fontUrl.startsWith('http://') && !fontUrl.startsWith('https://')) {
     //                     if (baseUrl.startsWith('http')) {
@@ -601,7 +599,6 @@ export class CssScanner {
     //             // boxicons işlendi → default FA logic'e girme
     //             continue;
     //         }
-
 
     //         if (!srcMatch) continue;
     //         const srcValue = srcMatch[1];
@@ -632,13 +629,9 @@ export class CssScanner {
     //     return fontMap;
     // }
 
-
     private static boxiconsFontUrls: string[] = [];
 
-    private static resolveFontUrls(
-        isBoxicon: boolean,
-        iconFontUrls: string[]
-    ): string[] {
+    private static resolveFontUrls(isBoxicon: boolean, iconFontUrls: string[]): string[] {
         if (isBoxicon && CssScanner.boxiconsFontUrls.length) {
             return CssScanner.boxiconsFontUrls;
         }
@@ -646,7 +639,10 @@ export class CssScanner {
     }
 
     // --- FA7 uyumlu extractIcons ---
-    private static async extractIcons(content: string, sourceName: string): Promise<IconDefinition[]> {
+    public static async extractIcons(
+        content: string,
+        sourceName: string
+    ): Promise<IconDefinition[]> {
         const icons: IconDefinition[] = [];
         const uniqueParams = new Set<string>();
         const commentRanges = await getCommentRanges(content);
@@ -654,9 +650,11 @@ export class CssScanner {
         const fontMap = this.extractFontFaces(content, sourceName);
         const iconFontUrls: string[] = [];
         for (const [family, urls] of fontMap.entries()) {
-            if (family.toLowerCase().includes('font awesome') ||
+            if (
+                family.toLowerCase().includes('font awesome') ||
                 family.toLowerCase().includes('bootstrap') ||
-                family.toLowerCase().includes('icon')) {
+                family.toLowerCase().includes('icon')
+            ) {
                 for (const url of urls) {
                     if (!iconFontUrls.includes(url)) {
                         iconFontUrls.push(url);
@@ -685,17 +683,27 @@ export class CssScanner {
             }
         }
         iconFontUrls.sort((a, b) => {
-            const aScore = a.includes('solid') ? 0 : a.includes('regular') ? 1 : a.includes('brands') ? 2 : 3;
-            const bScore = b.includes('solid') ? 0 : b.includes('regular') ? 1 : b.includes('brands') ? 2 : 3;
+            const aScore = a.includes('solid')
+                ? 0
+                : a.includes('regular')
+                  ? 1
+                  : a.includes('brands')
+                    ? 2
+                    : 3;
+            const bScore = b.includes('solid')
+                ? 0
+                : b.includes('regular')
+                  ? 1
+                  : b.includes('brands')
+                    ? 2
+                    : 3;
             return aScore - bScore;
         });
-
 
         const ruleRegex = /([^{]+)\{([^}]+)\}/g;
         let match: RegExpExecArray | null;
 
         while ((match = ruleRegex.exec(content)) !== null) {
-
             //  RULE COMMENT İÇİNDEYSE → TAMAMEN ATLA LAN O.Ç.
             if (isInsideComment(match.index, commentRanges)) {
                 continue;
@@ -708,17 +716,20 @@ export class CssScanner {
 
             if (!/content\s*:|--fa\s*:/.test(body)) continue;
 
-
             if (/^\s*:/.test(selector)) continue;
 
             const contentValueMatch =
-                /(?:content|--fa)\s*:\s*(?:["']\\?([a-fA-F0-9]+)["']|\\?([a-fA-F0-9]+))/i.exec(body);
-            const cssValue = contentValueMatch ? (contentValueMatch[1] || contentValueMatch[2]) : undefined;
+                /(?:content|--fa)\s*:\s*(?:["']\\?([a-fA-F0-9]+)["']|\\?([a-fA-F0-9]+))/i.exec(
+                    body
+                );
+            const cssValue = contentValueMatch
+                ? contentValueMatch[1] || contentValueMatch[2]
+                : undefined;
             if (!cssValue) continue;
 
             // --- FA7 uyumlu prefix parsing ---
             const classRegex = /\.([a-zA-Z0-9_\-]+)/g;
-            const classesInSelector: { className: string, prefix?: string }[] = [];
+            const classesInSelector: { className: string; prefix?: string }[] = [];
             let classMatch;
             while ((classMatch = classRegex.exec(selector)) !== null) {
                 const fullClass = classMatch[1];
@@ -728,14 +739,10 @@ export class CssScanner {
                 // örn: fas-user (nadiren) -> fas
                 let inferredPrefix: string | undefined;
                 if (/^(bxs|bxl|bx)-/i.test(fullClass)) {
-
                     inferredPrefix = detectBoxiconsFontType(fullClass, sourceName);
-
                 } else if (/^(fas|far|fal|fad|fab|fa)-/i.test(fullClass)) {
-
                     inferredPrefix = fullClass.split('-', 1)[0].toLowerCase();
-                }
-                else {
+                } else {
                     inferredPrefix = detectIconPrefix(fullClass);
                 }
 
@@ -756,7 +763,6 @@ export class CssScanner {
                     prefix = prevPrefixMatch[1].toLowerCase();
                 }
 
-
                 // detectIconPrefix ile tamamlama
                 let detectedPrefix: string | undefined;
 
@@ -765,19 +771,19 @@ export class CssScanner {
                 }
                 // Eğer boxicons değilse veya path'ten alamadıysak, classname'dan al
                 if (!detectedPrefix) {
-                    detectedPrefix = inferredPrefix || prefix || detectIconPrefix(fullClass);
+                    detectedPrefix =
+                        inferredPrefix || prefix || detectIconPrefix(fullClass);
                 }
 
                 classesInSelector.push({
                     className: fullClass,
-                    prefix: detectedPrefix
+                    prefix: detectedPrefix,
                 });
                 console.log('prefix:', detectedPrefix);
             }
 
             // Her prefix + class ayrı IconDefinition
             for (const { className, prefix } of classesInSelector) {
-
                 //BOXICONS MU?
                 const isBoxicon = prefix === 'bx' || prefix === 'bxs' || prefix === 'bxl';
 
@@ -789,7 +795,6 @@ export class CssScanner {
                 }
                 const library = this.resolveLibrary(content, sourceName);
                 if (library) {
-
                     // PREFIX ↔ LIBRARY DOĞRULAMA (DOĞRU YER)LIBRARY FILTER (SAFE VERSION)
                     if (library?.id === 'bootstrap-icons') {
                         if (!prefix && !className.startsWith('bi-')) continue;
@@ -797,7 +802,7 @@ export class CssScanner {
                     }
 
                     if (library?.id === 'boxicons') {
-                        if (!prefix) continue;//css içinde eğer prefix yoksa atla
+                        if (!prefix) continue; //css içinde eğer prefix yoksa atla
                         if (prefix && !['bx', 'bxl', 'bxs'].includes(prefix)) {
                             continue;
                         }
@@ -810,26 +815,32 @@ export class CssScanner {
                     //     }
                     // }
 
-                    const exists = TreeShaker.detectedLibraries.some(l =>
-                        l.id === library.id &&
-                        l.version === library.version &&
-                        l.cssPath === library.cssPath
+                    const exists = TreeShaker.detectedLibraries.some(
+                        (l) =>
+                            l.id === library.id &&
+                            l.version === library.version &&
+                            l.cssPath === library.cssPath
                     );
 
                     if (!exists) {
                         TreeShaker.detectedLibraries.push({
                             id: library.id,
                             version: library.version ?? 'unknown',
-                            cssPath: library.cssPath
+                            cssPath: library.cssPath,
                         });
                     }
                 }
 
                 //unicode hangi font dosyasının içinde
-                const matchedFontUrl = await FontManager.findFontContainingGlyph(parseInt(cssValue, 16), allUrls);
+                const matchedFontUrl = await FontManager.findFontContainingGlyph(
+                    parseInt(cssValue, 16),
+                    allUrls
+                );
 
                 //font dosyasından benzersiz font-family adı üret
-                const fontFamily = matchedFontUrl ? FontManager.getFontFamilyName(matchedFontUrl) : undefined;
+                const fontFamily = matchedFontUrl
+                    ? FontManager.getFontFamilyName(matchedFontUrl)
+                    : undefined;
 
                 //ikonun tekil kimliği
                 const uniqueKey = `${prefix ?? 'fa'}| ${matchedFontUrl}|${fontFamily} |${className}`;
@@ -845,7 +856,7 @@ export class CssScanner {
                         fontFamily,
                         isAlias: false, //this.aliasMap.has(className),
                         detectedFontType: prefix ? [prefix] : undefined,
-                        library
+                        library,
                     });
                     // console.log('Extracted icon:', className, 'from', sourceName,'prefix:',prefix);
                 }
@@ -856,14 +867,15 @@ export class CssScanner {
         const unicodeGroups = new Map<string, IconDefinition[]>();
         for (const icon of icons) {
             if (icon.cssValue) {
-                if (!unicodeGroups.has(icon.cssValue)) unicodeGroups.set(icon.cssValue, []);
+                if (!unicodeGroups.has(icon.cssValue))
+                    unicodeGroups.set(icon.cssValue, []);
                 unicodeGroups.get(icon.cssValue)!.push(icon);
             }
         }
 
         const unicodeEntries = Array.from(unicodeGroups.entries());
         let uIndex = 0;
-        const CONCURRENCY_UNICODES = 10;//ünicode için eşzamanlı işçi sayısı(fazlası yorar lan adamı)
+        const CONCURRENCY_UNICODES = 10; //ünicode için eşzamanlı işçi sayısı(fazlası yorar lan adamı)
 
         // async function unicodeWorker() {
         //     while (true) {
@@ -871,7 +883,6 @@ export class CssScanner {
         //         if (ui >= unicodeEntries.length) return;
         //         const [unicode, group] = unicodeEntries[ui];
         //         const candidateUrls = Array.from(new Set(group.flatMap(g => g.allFontUrls || [])));
-
 
         //         // ---- BOXICONS: unicode taramasını tamamen atla ----
         //         if (group[0]?.library?.id === 'boxicons') {
@@ -950,12 +961,12 @@ export class CssScanner {
         // }
 
         function isFontAwesomeGroup(group: IconDefinition[]): boolean {
-            return group.some(icon => {
+            return group.some((icon) => {
                 const p = icon.prefix;
                 if (!p) return false;
 
                 const prefixes = Array.isArray(p) ? p : [p];
-                return prefixes.some(px => px.startsWith('fa'));
+                return prefixes.some((px) => px.startsWith('fa'));
             });
         }
 
@@ -966,7 +977,7 @@ export class CssScanner {
 
                 const [unicode, group] = unicodeEntries[ui];
                 const candidateUrls = Array.from(
-                    new Set(group.flatMap(g => g.allFontUrls || []))
+                    new Set(group.flatMap((g) => g.allFontUrls || []))
                 );
 
                 // =====================================================
@@ -978,10 +989,10 @@ export class CssScanner {
                         icon.detectedFontType = [
                             detectBoxiconsFontType(
                                 icon.library?.cssPath ||
-                                icon.sourceFile ||
-                                icon.fontUrl ||
-                                ''
-                            )
+                                    icon.sourceFile ||
+                                    icon.fontUrl ||
+                                    ''
+                            ),
                         ];
                         // fontUrl zaten extractIcons'ta doğru
                     }
@@ -992,17 +1003,21 @@ export class CssScanner {
                     const isFontAwesome = isFontAwesomeGroup(group);
 
                     const foundFontUrls = isFontAwesome
-                        ? await CssScanner.detectFontUrlsForUnicode(unicode, candidateUrls)
-                        : await CssScanner.detectFontUrlsForUnicodeCached(unicode, candidateUrls);
+                        ? await CssScanner.detectFontUrlsForUnicode(
+                              unicode,
+                              candidateUrls
+                          )
+                        : await CssScanner.detectFontUrlsForUnicodeCached(
+                              unicode,
+                              candidateUrls
+                          );
 
                     const detectedTypes = foundFontUrls.length
                         ? Array.from(
-                            new Set(
-                                foundFontUrls.map(url =>
-                                    detectFontTypeForUnic(url)
-                                )
-                            )
-                        )
+                              new Set(
+                                  foundFontUrls.map((url) => detectFontTypeForUnic(url))
+                              )
+                          )
                         : null;
 
                     for (const icon of group) {
@@ -1037,7 +1052,7 @@ export class CssScanner {
 
         // Sibling class'lar ve unicode map
         for (const [unicode, group] of unicodeGroups.entries()) {
-            const classNames = group.map(icon => icon.className);
+            const classNames = group.map((icon) => icon.className);
             this.unicodeToClassesMap.set(unicode, classNames);
             for (const icon of group) {
                 icon.siblingClassNames = classNames;
@@ -1049,7 +1064,10 @@ export class CssScanner {
     }
 
     //detectFontUrlsForUnicode chace siz eski yapı, FA ,.,n mecburen kullanıyoruz.
-    private static async detectFontUrlsForUnicode(unicodeHex: string, fontUrls: string[]): Promise<string[]> {
+    private static async detectFontUrlsForUnicode(
+        unicodeHex: string,
+        fontUrls: string[]
+    ): Promise<string[]> {
         if (!fontUrls || fontUrls.length === 0) return [];
         const charCode = parseInt(unicodeHex, 16);
         if (!charCode) return [];
@@ -1078,7 +1096,7 @@ export class CssScanner {
                     }
                 }
             } catch (err) {
-                console.warn("Font test failed:", url, err);
+                console.warn('Font test failed:', url, err);
             }
         }
         return found;
@@ -1087,7 +1105,10 @@ export class CssScanner {
     private static remoteFontCache: Map<string, Set<string>> = new Map();
 
     //chace yapı tek tip dönmesine sebep oldu sonradan fixlenebilir.
-    private static async detectFontUrlsForUnicodeCached(unicodeHex: string, fontUrls: string[]): Promise<string[]> {
+    private static async detectFontUrlsForUnicodeCached(
+        unicodeHex: string,
+        fontUrls: string[]
+    ): Promise<string[]> {
         const results: string[] = [];
         const charCode = parseInt(unicodeHex, 16);
         if (!charCode) return results;
@@ -1108,7 +1129,7 @@ export class CssScanner {
                     results.push(url);
                 }
             } catch (e) {
-                console.warn("Font check failed:", url, e);
+                console.warn('Font check failed:', url, e);
             }
         }
         return results;
@@ -1117,16 +1138,13 @@ export class CssScanner {
     private static libraryCache = new Map<string, IconLibraryInfo | undefined>();
 
     private static isLikelyIconFont(css: string): boolean {
-
         return (
             /@font-face/i.test(css) &&
-            (
-                /font-awesome|font awesome/i.test(css) ||
-                /--fa-/i.test(css) ||              // <<< KRİTİK
-                /fa-[a-z]+-\d{3}/i.test(css) ||     // fa-solid-900 vs
+            (/font-awesome|font awesome/i.test(css) ||
+                /--fa-/i.test(css) || // <<< KRİTİK
+                /fa-[a-z]+-\d{3}/i.test(css) || // fa-solid-900 vs
                 /bootstrap-icons/i.test(css) ||
-                /boxicons/i.test(css)
-            )
+                /boxicons/i.test(css))
         );
 
         //      return (
@@ -1148,7 +1166,6 @@ export class CssScanner {
         cssContent: string,
         filePath: string
     ): IconLibraryInfo | undefined {
-
         if (this.libraryCache.has(filePath)) {
             return this.libraryCache.get(filePath);
         }
@@ -1168,7 +1185,7 @@ export class CssScanner {
                 displayName: 'Unknown Icon Font',
                 version: v.version,
                 cssPath: filePath,
-                confidence: 'low'
+                confidence: 'low',
             };
         }
         this.libraryCache.set(filePath, undefined);

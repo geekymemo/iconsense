@@ -83,7 +83,7 @@ class CssScanner {
             const cssResults = await this.processInBatches(cssFiles, 50, async (file) => {
                 return this.parseCssFile(file.fsPath);
             });
-            cssResults.forEach(icons => allIcons.push(...icons));
+            cssResults.forEach((icons) => allIcons.push(...icons));
         }
         if (scanHtml) {
             const htmlFiles = await vscode.workspace.findFiles('**/*.html', '**/node_modules/**');
@@ -92,12 +92,12 @@ class CssScanner {
                 try {
                     if (url.startsWith('http')) {
                         const css = await (0, CssFetch_1.fetchUrlCached)(url);
-                        allIcons.push(...await this.extractIcons(css, url));
+                        allIcons.push(...(await this.extractIcons(css, url)));
                     }
                     else {
                         const resolved = this.resolveWorkspaceCss(url);
                         if (resolved) {
-                            allIcons.push(...await this.parseCssFile(resolved));
+                            allIcons.push(...(await this.parseCssFile(resolved)));
                         }
                     }
                 }
@@ -115,12 +115,12 @@ class CssScanner {
                     for (const url of cssUrls) {
                         if (url.startsWith('http')) {
                             const css = await (0, CssFetch_1.fetchUrlCached)(url);
-                            allIcons.push(...await this.extractIcons(css, url));
+                            allIcons.push(...(await this.extractIcons(css, url)));
                         }
                         else {
                             const resolved = this.resolveWorkspaceCss(url);
                             if (resolved) {
-                                allIcons.push(...await this.parseCssFile(resolved));
+                                allIcons.push(...(await this.parseCssFile(resolved)));
                             }
                         }
                     }
@@ -144,7 +144,7 @@ class CssScanner {
                 next: nextEnabled,
                 scanPhp,
                 scanJsTs,
-                scanHtml
+                scanHtml,
             });
         }
         if (!autoScanCss && (reactEnabled || nextEnabled || vueEnabled || nuxtEnabled)) {
@@ -171,7 +171,7 @@ class CssScanner {
                 const cssPath = match[1] || match[2];
                 const resolved = this.resolveWorkspaceCss(cssPath, file.fsPath);
                 if (resolved) {
-                    allIcons.push(...await this.parseCssFile(resolved));
+                    allIcons.push(...(await this.parseCssFile(resolved)));
                 }
             }
         }
@@ -233,12 +233,12 @@ class CssScanner {
                 const cssPath = match[1];
                 if (cssPath.startsWith('http')) {
                     const css = await (0, CssFetch_1.fetchUrl)(cssPath);
-                    allIcons.push(...await this.extractIcons(css, cssPath));
+                    allIcons.push(...(await this.extractIcons(css, cssPath)));
                 }
                 else {
                     const resolved = this.resolveWorkspaceCss(cssPath, file.fsPath);
                     if (resolved) {
-                        allIcons.push(...await this.parseCssFile(resolved));
+                        allIcons.push(...(await this.parseCssFile(resolved)));
                     }
                 }
             }
@@ -297,12 +297,12 @@ class CssScanner {
                 const cssPath = match[1];
                 if (cssPath.startsWith('http')) {
                     const css = await (0, CssFetch_1.fetchUrl)(cssPath);
-                    allIcons.push(...await this.extractIcons(css, cssPath));
+                    allIcons.push(...(await this.extractIcons(css, cssPath)));
                 }
                 else {
                     const resolved = this.resolveWorkspaceCss(cssPath, file.fsPath);
                     if (resolved) {
-                        allIcons.push(...await this.parseCssFile(resolved));
+                        allIcons.push(...(await this.parseCssFile(resolved)));
                     }
                 }
             }
@@ -362,8 +362,7 @@ class CssScanner {
                 let fontUrl = normalizeFontUrl(urlMatch[1]);
                 if (fontUrl.endsWith('.eot'))
                     continue;
-                if (!fontUrl.startsWith('http://') &&
-                    !fontUrl.startsWith('https://')) {
+                if (!fontUrl.startsWith('http://') && !fontUrl.startsWith('https://')) {
                     if (baseUrl.startsWith('http')) {
                         const cssBaseUrl = baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1);
                         fontUrl = new URL(fontUrl, cssBaseUrl).href;
@@ -414,8 +413,20 @@ class CssScanner {
             }
         }
         iconFontUrls.sort((a, b) => {
-            const aScore = a.includes('solid') ? 0 : a.includes('regular') ? 1 : a.includes('brands') ? 2 : 3;
-            const bScore = b.includes('solid') ? 0 : b.includes('regular') ? 1 : b.includes('brands') ? 2 : 3;
+            const aScore = a.includes('solid')
+                ? 0
+                : a.includes('regular')
+                    ? 1
+                    : a.includes('brands')
+                        ? 2
+                        : 3;
+            const bScore = b.includes('solid')
+                ? 0
+                : b.includes('regular')
+                    ? 1
+                    : b.includes('brands')
+                        ? 2
+                        : 3;
             return aScore - bScore;
         });
         const ruleRegex = /([^{]+)\{([^}]+)\}/g;
@@ -431,7 +442,9 @@ class CssScanner {
             if (/^\s*:/.test(selector))
                 continue;
             const contentValueMatch = /(?:content|--fa)\s*:\s*(?:["']\\?([a-fA-F0-9]+)["']|\\?([a-fA-F0-9]+))/i.exec(body);
-            const cssValue = contentValueMatch ? (contentValueMatch[1] || contentValueMatch[2]) : undefined;
+            const cssValue = contentValueMatch
+                ? contentValueMatch[1] || contentValueMatch[2]
+                : undefined;
             if (!cssValue)
                 continue;
             const classRegex = /\.([a-zA-Z0-9_\-]+)/g;
@@ -464,11 +477,12 @@ class CssScanner {
                     detectedPrefix = (0, IconPrefix_1.detectBoxiconsFontType)(sourceName);
                 }
                 if (!detectedPrefix) {
-                    detectedPrefix = inferredPrefix || prefix || (0, IconPrefix_1.detectIconPrefix)(fullClass);
+                    detectedPrefix =
+                        inferredPrefix || prefix || (0, IconPrefix_1.detectIconPrefix)(fullClass);
                 }
                 classesInSelector.push({
                     className: fullClass,
-                    prefix: detectedPrefix
+                    prefix: detectedPrefix,
                 });
                 console.log('prefix:', detectedPrefix);
             }
@@ -494,19 +508,21 @@ class CssScanner {
                             continue;
                         }
                     }
-                    const exists = treeShaking_1.TreeShaker.detectedLibraries.some(l => l.id === library.id &&
+                    const exists = treeShaking_1.TreeShaker.detectedLibraries.some((l) => l.id === library.id &&
                         l.version === library.version &&
                         l.cssPath === library.cssPath);
                     if (!exists) {
                         treeShaking_1.TreeShaker.detectedLibraries.push({
                             id: library.id,
                             version: library.version ?? 'unknown',
-                            cssPath: library.cssPath
+                            cssPath: library.cssPath,
                         });
                     }
                 }
                 const matchedFontUrl = await FontManager_1.FontManager.findFontContainingGlyph(parseInt(cssValue, 16), allUrls);
-                const fontFamily = matchedFontUrl ? FontManager_1.FontManager.getFontFamilyName(matchedFontUrl) : undefined;
+                const fontFamily = matchedFontUrl
+                    ? FontManager_1.FontManager.getFontFamilyName(matchedFontUrl)
+                    : undefined;
                 const uniqueKey = `${prefix ?? 'fa'}| ${matchedFontUrl}|${fontFamily} |${className}`;
                 if (!uniqueParams.has(uniqueKey)) {
                     uniqueParams.add(uniqueKey);
@@ -520,7 +536,7 @@ class CssScanner {
                         fontFamily,
                         isAlias: false,
                         detectedFontType: prefix ? [prefix] : undefined,
-                        library
+                        library,
                     });
                 }
             }
@@ -537,12 +553,12 @@ class CssScanner {
         let uIndex = 0;
         const CONCURRENCY_UNICODES = 10;
         function isFontAwesomeGroup(group) {
-            return group.some(icon => {
+            return group.some((icon) => {
                 const p = icon.prefix;
                 if (!p)
                     return false;
                 const prefixes = Array.isArray(p) ? p : [p];
-                return prefixes.some(px => px.startsWith('fa'));
+                return prefixes.some((px) => px.startsWith('fa'));
             });
         }
         async function unicodeWorker() {
@@ -551,14 +567,14 @@ class CssScanner {
                 if (ui >= unicodeEntries.length)
                     return;
                 const [unicode, group] = unicodeEntries[ui];
-                const candidateUrls = Array.from(new Set(group.flatMap(g => g.allFontUrls || [])));
+                const candidateUrls = Array.from(new Set(group.flatMap((g) => g.allFontUrls || [])));
                 if (group[0]?.library?.id === 'boxicons') {
                     for (const icon of group) {
                         icon.detectedFontType = [
                             (0, IconPrefix_1.detectBoxiconsFontType)(icon.library?.cssPath ||
                                 icon.sourceFile ||
                                 icon.fontUrl ||
-                                '')
+                                ''),
                         ];
                     }
                     continue;
@@ -569,7 +585,7 @@ class CssScanner {
                         ? await CssScanner.detectFontUrlsForUnicode(unicode, candidateUrls)
                         : await CssScanner.detectFontUrlsForUnicodeCached(unicode, candidateUrls);
                     const detectedTypes = foundFontUrls.length
-                        ? Array.from(new Set(foundFontUrls.map(url => (0, library_detectors_1.detectFontTypeForUnic)(url))))
+                        ? Array.from(new Set(foundFontUrls.map((url) => (0, library_detectors_1.detectFontTypeForUnic)(url))))
                         : null;
                     for (const icon of group) {
                         if (!detectedTypes) {
@@ -598,7 +614,7 @@ class CssScanner {
             workers.push(unicodeWorker());
         await Promise.all(workers);
         for (const [unicode, group] of unicodeGroups.entries()) {
-            const classNames = group.map(icon => icon.className);
+            const classNames = group.map((icon) => icon.className);
             this.unicodeToClassesMap.set(unicode, classNames);
             for (const icon of group) {
                 icon.siblingClassNames = classNames;
@@ -637,7 +653,7 @@ class CssScanner {
                 }
             }
             catch (err) {
-                console.warn("Font test failed:", url, err);
+                console.warn('Font test failed:', url, err);
             }
         }
         return found;
@@ -667,7 +683,7 @@ class CssScanner {
                 }
             }
             catch (e) {
-                console.warn("Font check failed:", url, e);
+                console.warn('Font check failed:', url, e);
             }
         }
         return results;
@@ -699,7 +715,7 @@ class CssScanner {
                 displayName: 'Unknown Icon Font',
                 version: v.version,
                 cssPath: filePath,
-                confidence: 'low'
+                confidence: 'low',
             };
         }
         this.libraryCache.set(filePath, undefined);
